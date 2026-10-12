@@ -432,40 +432,25 @@ hr {
 
 
 def apply_custom_theme():
-    """Áp dụng bộ CSS Dark Glassmorphism tùy chỉnh và tối ưu hiển thị Desktop App."""
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    """Use the project theme configured in .streamlit/config.toml."""
+    return None
 
 
 def render_page_header(title: str, subtitle: str = "", badge: str = ""):
-    """Render tiêu đề trang sang trọng với badge gradient và subtitle."""
-    badge_html = f'<div class="badge-pill"><span class="badge-dot"></span>{badge}</div>' if badge else ""
-    st.markdown(
-        f"""
-        <div style="margin-bottom: 1.25rem;">
-            {badge_html}
-            <h1 class="hero-title">{title}</h1>
-            <p class="hero-subtitle">{subtitle}</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    """Render a readable native page header."""
+    st.title(title)
+    if subtitle:
+        st.caption(subtitle)
+    if badge:
+        st.badge(badge, icon=":material/label:", color="blue")
 
 
 def render_kpi_card(label: str, value: str, subtext: str = "", icon: str = "📈", theme: str = "indigo"):
-    """Render thẻ KPI card kiểu Dark Glassmorphism."""
-    st.markdown(
-        f"""
-        <div class="glass-card">
-            <div class="glass-card-top">
-                <span class="glass-card-label">{label}</span>
-                <div class="glass-card-icon icon-{theme}">{icon}</div>
-            </div>
-            <div class="glass-card-value">{value}</div>
-            <div class="glass-card-sub">{subtext}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    """Render a native bordered KPI card."""
+    with st.container(border=True):
+        st.metric(label, value)
+        if subtext:
+            st.caption(subtext)
 
 
 def get_status_chip(status: str) -> str:

@@ -170,21 +170,21 @@ for p in filtered_posts:
             # Nút phê duyệt
             b1, b2, b3 = st.columns(3)
             with b1:
-                if st.button("✅ Duyệt", key=f"app_{post_id}", type="primary", use_container_width=True):
+                if st.button("Duyệt", key=f"app_{post_id}", type="primary", width="stretch"):
                     conn = get_connection()
                     update_post_status(conn, post_id, "Approved")
                     conn.close()
                     st.success("Đã duyệt!")
                     st.rerun()
             with b2:
-                if st.button("❌ Từ chối", key=f"rej_{post_id}", type="secondary", use_container_width=True):
+                if st.button("Từ chối", key=f"rej_{post_id}", type="secondary", width="stretch"):
                     conn = get_connection()
                     update_post_status(conn, post_id, "Rejected")
                     conn.close()
                     st.warning("Đã từ chối!")
                     st.rerun()
             with b3:
-                if st.button("💾 Lưu sửa", key=f"save_{post_id}", use_container_width=True):
+                if st.button("Lưu sửa", key=f"save_{post_id}", width="stretch"):
                     new_content = st.session_state.get(f"txt_{post_id}", p["content"])
                     conn = get_connection()
                     update_post_content(conn, post_id, p["title"], new_content)

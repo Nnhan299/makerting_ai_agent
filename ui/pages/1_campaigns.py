@@ -113,14 +113,14 @@ with tab1:
                     
                     c_act1, c_act2 = st.columns(2)
                     with c_act1:
-                        if st.button("Lưu", key=f"btn_save_{camp['id']}", type="primary", use_container_width=True):
+                        if st.button("Lưu", key=f"btn_save_{camp['id']}", type="primary", width="stretch"):
                             conn = get_connection()
                             update_campaign(conn, camp["id"], status=new_status)
                             conn.close()
                             st.success("Đã cập nhật!")
                             st.rerun()
                     with c_act2:
-                        if st.button("Xóa", key=f"btn_del_{camp['id']}", type="secondary", use_container_width=True):
+                        if st.button("Xóa", key=f"btn_del_{camp['id']}", type="secondary", width="stretch"):
                             conn = get_connection()
                             delete_campaign(conn, camp["id"])
                             conn.close()
@@ -160,7 +160,7 @@ with tab2:
             height=120
         )
 
-        submitted = st.form_submit_button("🚀 Khởi Tạo Campaign Brief Mới", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Khởi tạo campaign brief", type="primary", width="stretch")
 
         if submitted:
             if not name.strip() or not product_name.strip():

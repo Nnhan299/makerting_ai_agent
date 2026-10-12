@@ -105,7 +105,7 @@ with col_ex1:
             file_name=f"Marketing_Campaign_{selected_camp_id}_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary",
-            use_container_width=True
+            width="stretch"
         )
     else:
         st.warning("Chiến dịch này chưa có bài viết để xuất Excel.")
@@ -119,7 +119,7 @@ with col_ex2:
         email_subject = st.text_input("Tiêu đề Email", value=f"[Marketing AI Report] Kế hoạch nội dung {campaign['name']}")
         email_notes = st.text_area("Ghi chú bổ sung đính kèm", placeholder="Kính gửi Trưởng phòng, đây là kế hoạch nội dung đã được AI sinh và kiểm duyệt...", height=100)
         
-        btn_send_email = st.form_submit_button("📧 Gửi Email Báo cáo Trực tiếp", use_container_width=True)
+        btn_send_email = st.form_submit_button("Gửi email báo cáo", width="stretch")
 
         if btn_send_email:
             if not recipient_email.strip():

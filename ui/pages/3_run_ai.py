@@ -143,7 +143,7 @@ st.markdown(
 )
 
 # 4. KÍCH HOẠT PIPELINE
-btn_trigger = st.button("🚀 KÍCH HOẠT AI MULTI-AGENT PIPELINE NGAY", type="primary", use_container_width=True)
+btn_trigger = st.button("Kích hoạt AI multi-agent pipeline", type="primary", width="stretch")
 
 if btn_trigger:
     st.markdown("### 🔄 Trạng thái Xử lý Trực tiếp")

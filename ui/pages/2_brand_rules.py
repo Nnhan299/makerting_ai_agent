@@ -45,7 +45,7 @@ with tab1:
     with col_top1:
         st.caption("Các bộ quy tắc đang được áp dụng trong quá trình Agent 3 kiểm duyệt nội dung.")
     with col_top2:
-        if st.button("⚡ Nạp nhanh Quy tắc Mẫu", type="secondary", use_container_width=True):
+        if st.button("Nạp nhanh quy tắc mẫu", type="secondary", width="stretch"):
             try:
                 conn = get_connection()
                 create_brand_rule(
@@ -105,7 +105,7 @@ with tab1:
                 
                 c_del, _ = st.columns([1, 4])
                 with c_del:
-                    if st.button("❌ Xóa quy tắc này", key=f"del_rule_{r['id']}", type="secondary", use_container_width=True):
+                    if st.button("Xóa quy tắc này", key=f"del_rule_{r['id']}", type="secondary", width="stretch"):
                         conn = get_connection()
                         delete_brand_rule(conn, r['id'])
                         conn.close()
@@ -140,7 +140,7 @@ with tab2:
             height=80
         )
 
-        btn_save_rule = st.form_submit_button("🛡️ Lưu Bộ Quy tắc", type="primary", use_container_width=True)
+        btn_save_rule = st.form_submit_button("Lưu bộ quy tắc", type="primary", width="stretch")
 
         if btn_save_rule:
             if not rule_name.strip():

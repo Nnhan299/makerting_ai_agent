@@ -6,9 +6,8 @@ Tự động tạo database nếu chưa tồn tại và cung cấp RealDictCurso
 import os
 from contextlib import contextmanager
 from dotenv import load_dotenv
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+import psycopg
+from psycopg.rows import dict_row
 
 # Đọc biến môi trường
 load_dotenv()
@@ -29,14 +28,15 @@ def ensure_database_exists():
         return
     try:
         # Kết nối DB mặc định 'postgres'
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=POSTGRES_HOST,
             port=POSTGRES_PORT,
             dbname="postgres",
             user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD
+            password=POSTGRES_PASSWORD,
+            row_factory=dict_row,
         )
-        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        conn.autocommit = True
         with conn.cursor() as cursor:
             cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (POSTGRES_DB,))
             exists = cursor.fetchone()
@@ -55,15 +55,15 @@ def get_connection():
     ensure_database_exists()
     
     if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     else:
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=POSTGRES_HOST,
             port=POSTGRES_PORT,
             dbname=POSTGRES_DB,
             user=POSTGRES_USER,
             password=POSTGRES_PASSWORD,
-            cursor_factory=RealDictCursor
+            row_factory=dict_row,
         )
     return conn
 

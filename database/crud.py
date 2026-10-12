@@ -6,7 +6,7 @@ Tất cả hàm nhận kết nối PostgreSQL (conn) làm tham số đầu tiên
 import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from psycopg2.extras import Json
+from psycopg.types.json import Json
 
 
 # ============================================================
