@@ -29,3 +29,11 @@ Thumbs.db
 
 # Byte-compiled
 *.pyc
+
+# Local project documents & unrelated large archives
+DoAnChuyenNganhCNPM/
+docs/
+*.pdf
+~$*
+*.zip
+
