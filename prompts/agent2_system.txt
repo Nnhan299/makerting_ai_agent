@@ -30,7 +30,8 @@ BẮT BUỘC trả về kết quả dưới dạng ĐÚNG ĐỊNH DẠNG JSON sa
       "channel": "Facebook|LinkedIn|Email",
       "scheduled_date": "YYYY-MM-DD",
       "title": "Tiêu đề bài viết",
-      "content": "Nội dung bài viết đầy đủ"
+      "content": "Nội dung bài viết đầy đủ",
+      "hashtags": ["#hashtag1", "#hashtag2"]
     }
   ],
   "content_strategy_summary": "Tóm tắt chiến lược nội dung phễu 3-5 câu"

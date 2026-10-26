@@ -84,7 +84,15 @@ class AgentOrchestrator:
             copywriter_output = self.agent2.execute(input_agent2)
             self.checkpoint["agent2_output"] = copywriter_output
             posts_list = copywriter_output.get("posts", [])
-            self.log(f"✅ Agent 2 hoàn thành! Đã tạo {len(posts_list)} bài đăng.")
+
+            # Tự động gán hình ảnh đẹp và phù hợp từ Thư viện Media cho từng bài viết
+            try:
+                from utils.media_manager import auto_assign_images
+                posts_list = auto_assign_images(posts_list, brief.get("product_name", ""))
+            except Exception as e_media:
+                logger.warning(f"Lỗi tự động gán media: {e_media}")
+
+            self.log(f"✅ Agent 2 hoàn thành! Đã tạo {len(posts_list)} bài đăng kèm hình ảnh minh họa.")
 
             # === CHẠY AGENT 3 ===
             self.current_step = 3
@@ -105,34 +113,66 @@ class AgentOrchestrator:
             # Xóa các bài viết cũ của chiến dịch này (nếu có) trước khi chèn bài mới
             delete_posts_by_campaign(self.conn, campaign_id)
             
-            # Chuẩn bị dữ liệu chèn posts
+            # Chuẩn bị dữ liệu chèn posts (Phòng thủ kiểm tra kiểu dữ liệu an toàn)
             posts_to_insert = []
             for post in posts_list:
-                posts_to_insert.append({
-                    "campaign_id": campaign_id,
-                    "stage": post.get("stage", "Teaser"),
-                    "channel": post.get("channel", "Facebook"),
-                    "title": post.get("title", ""),
-                    "content": post.get("content", ""),
-                    "scheduled_date": post.get("scheduled_date", brief.get("start_date"))
-                })
+                if isinstance(post, dict):
+                    posts_to_insert.append({
+                        "campaign_id": campaign_id,
+                        "stage": post.get("stage", "Teaser"),
+                        "channel": post.get("channel", "Facebook"),
+                        "title": post.get("title", ""),
+                        "content": post.get("content", ""),
+                        "hashtags": post.get("hashtags", []),
+                        "scheduled_date": post.get("scheduled_date", brief.get("start_date")),
+                        "media_url": post.get("media_url")
+                    })
+                elif isinstance(post, str):
+                    posts_to_insert.append({
+                        "campaign_id": campaign_id,
+                        "stage": "Launch",
+                        "channel": "Facebook",
+                        "title": post[:40],
+                        "content": post,
+                        "hashtags": [],
+                        "scheduled_date": brief.get("start_date")
+                    })
                 
             created_post_ids = create_posts_bulk(self.conn, posts_to_insert)
             
-            # Khớp post_id mới với kết quả audit từ Agent 3
-            audited_posts = audit_report.get("audited_posts", [])
+            # Khớp post_id mới với kết quả audit từ Agent 3 cho TẤT CẢ các bài đã tạo
+            audited_posts = audit_report.get("audited_posts", []) if isinstance(audit_report, dict) else []
             audit_logs_to_insert = []
             
-            for idx, audited in enumerate(audited_posts):
-                if idx < len(created_post_ids):
-                    post_id = created_post_ids[idx]
-                    audit_logs_to_insert.append({
-                        "post_id": post_id,
-                        "rule_id": brand_rule_id,
-                        "compliance_score": audited.get("compliance_score", 100),
-                        "violations_json": audited.get("violations", []),
-                        "suggestions": str(audited.get("suggestions", ""))
-                    })
+            for idx, post_id in enumerate(created_post_ids):
+                audited = audited_posts[idx] if idx < len(audited_posts) else {}
+                if isinstance(audited, str):
+                    audited = {"violations": [], "compliance_score": 100, "suggestions": audited}
+                elif not isinstance(audited, dict):
+                    audited = {}
+
+                violations = audited.get("violations", [])
+                if not isinstance(violations, list):
+                    violations = [violations] if violations else []
+
+                suggestions = audited.get("suggestions")
+                if not suggestions and violations:
+                    sug_list = [v.get("suggestion") for v in violations if isinstance(v, dict) and v.get("suggestion")]
+                    suggestions = "; ".join([str(s) for s in sug_list if s])
+
+                comp_score = audited.get("compliance_score", 100)
+                try:
+                    comp_score = float(comp_score)
+                except (ValueError, TypeError):
+                    comp_score = 100.0
+
+                audit_logs_to_insert.append({
+                    "post_id": post_id,
+                    "rule_id": brand_rule_id,
+                    "compliance_score": comp_score,
+                    "violations_json": violations,
+                    "suggestions": str(suggestions or "")
+                })
                     
             if audit_logs_to_insert:
                 create_audit_logs_bulk(self.conn, audit_logs_to_insert)
@@ -142,7 +182,8 @@ class AgentOrchestrator:
             
             final_result = {
                 "insights": insights,
-                "posts": copywriter_output,
+                "posts": posts_list,
+                "content_strategy_summary": copywriter_output.get("content_strategy_summary", "") if isinstance(copywriter_output, dict) else "",
                 "audit_report": audit_report,
                 "total_posts": len(posts_list),
                 "overall_score": overall_score,
