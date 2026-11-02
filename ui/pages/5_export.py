@@ -22,6 +22,7 @@ from database.crud import (
     get_audits_by_campaign
 )
 from utils.export_excel import export_campaign_to_excel
+from ui.components.auth import require_auth
 from ui.components.sidebar import render_sidebar
 from ui.components.navbar import render_dynamic_dock
 from ui.components.theme import (
@@ -32,6 +33,7 @@ from ui.components.theme import (
 
 st.set_page_config(page_title="Xuất bản & Báo cáo - Marketing AI", page_icon="📤", layout="wide")
 apply_custom_theme()
+require_auth()
 render_sidebar()
 render_dynamic_dock("export")
 
@@ -80,6 +82,16 @@ st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 col_ex1, col_ex2 = st.columns(2, gap="large")
 
+@st.cache_data(show_spinner="Đang tạo file Excel...", ttl=120)
+def get_cached_excel_bytes(camp_id: int, num_posts: int, num_audits: int):
+    conn = get_connection()
+    c = get_campaign_by_id(conn, camp_id)
+    p = get_posts_by_campaign(conn, camp_id)
+    a = get_audits_by_campaign(conn, camp_id)
+    conn.close()
+    return export_campaign_to_excel(c, p, a)
+
+
 # 2. XUẤT EXCEL CHUYÊN NGHIỆP
 with col_ex1:
     st.markdown("### 📥 1. Trích xuất File Excel (.xlsx)")
@@ -98,7 +110,7 @@ with col_ex1:
     )
     
     if posts:
-        excel_bytes = export_campaign_to_excel(campaign, posts, audit_logs)
+        excel_bytes = get_cached_excel_bytes(selected_camp_id, len(posts), len(audit_logs))
         st.download_button(
             label="📥 TẢI XUỐNG FILE EXCEL (.XLSX)",
             data=excel_bytes,

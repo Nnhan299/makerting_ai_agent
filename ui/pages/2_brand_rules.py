@@ -17,6 +17,7 @@ from database.crud import (
     get_all_brand_rules,
     delete_brand_rule
 )
+from ui.components.auth import require_auth
 from ui.components.sidebar import render_sidebar
 from ui.components.navbar import render_dynamic_dock
 from ui.components.theme import (
@@ -26,6 +27,7 @@ from ui.components.theme import (
 
 st.set_page_config(page_title="Quy tắc Thương hiệu - Marketing AI", page_icon="🛡️", layout="wide")
 apply_custom_theme()
+require_auth()
 render_sidebar()
 render_dynamic_dock("brand_rules")
 
