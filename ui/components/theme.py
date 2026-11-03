@@ -10,10 +10,10 @@ CUSTOM_CSS = """
 /* ============================================================
    GOOGLE FONTS & BASE TYPOGRAPHY
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
 
 html, body, [class*="css"], .stApp {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', Roboto, sans-serif !important;
     background-color: #0B0F19 !important;
     color: #F1F5F9 !important;
 }
@@ -460,6 +460,8 @@ def get_status_chip(status: str) -> str:
         return '<span class="chip chip-inprogress">🔄 In-Progress</span>'
     elif "approved" in st_val:
         return '<span class="chip chip-approved">✅ Approved</span>'
+    elif "published" in st_val:
+        return '<span class="chip chip-completed">🚀 Published</span>'
     elif "completed" in st_val:
         return '<span class="chip chip-completed">🏁 Completed</span>'
     elif "rejected" in st_val:

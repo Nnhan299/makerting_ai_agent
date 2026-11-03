@@ -12,3 +12,7 @@ showErrorDetails = "type"
 
 [browser]
 gatherUsageStats = false
+
+[server]
+fileWatcherType = "none"
+runOnSave = false
