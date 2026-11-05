@@ -19,6 +19,8 @@ import {
   Edit3
 } from 'lucide-react';
 
+import { publishPostApi, updatePostApi } from '../api';
+
 export default function CalendarReview({ posts, setPosts, onNavigateToStudio }) {
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' | 'list'
   const [channelFilter, setChannelFilter] = useState('all');
@@ -102,17 +104,23 @@ export default function CalendarReview({ posts, setPosts, onNavigateToStudio }) 
 
   const selectedPost = allPosts.find(p => p.id === selectedPostId) || allPosts[0];
 
-  const handlePublishNow = (id) => {
+  const handlePublishNow = async (id) => {
+    const postUrl = `https://facebook.com/PureGlowVN/posts/fb_${Date.now()}`;
+    await publishPostApi(id, postUrl);
     setPublishedPosts(prev => ({
       ...prev,
       [id]: {
         published_at: new Date().toLocaleTimeString(),
-        post_url: `https://facebook.com/PureGlowVN/posts/fb_${Date.now()}`
+        post_url: postUrl
       }
     }));
+    if (setPosts) {
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'Published' } : p));
+    }
   };
 
-  const handleApprove = (id) => {
+  const handleApprove = async (id) => {
+    await updatePostApi(id, { status: 'Approved' });
     if (setPosts) {
       setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'Approved' } : p));
     }

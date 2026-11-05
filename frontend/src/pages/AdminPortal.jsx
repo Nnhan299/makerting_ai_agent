@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   Key, 
@@ -20,6 +20,8 @@ import {
   Sliders,
   CheckCircle2
 } from 'lucide-react';
+
+import { fetchUsers, createUserApi, deleteUserApi } from '../api';
 
 export default function AdminPortal() {
   const [activeTab, setActiveTab] = useState('users');
@@ -48,6 +50,23 @@ export default function AdminPortal() {
     role: 'Content Creator'
   });
 
+  // Fetch users from DB
+  useEffect(() => {
+    async function loadUsers() {
+      const dbUsers = await fetchUsers();
+      if (dbUsers && dbUsers.length > 0) {
+        setUsers(dbUsers.map(u => ({
+          ...u,
+          initials: (u.name || u.username).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
+          status: 'Active',
+          last_login: '14:28 Hôm nay',
+          two_fa: true
+        })));
+      }
+    }
+    loadUsers();
+  }, []);
+
   const handleSaveKeys = (e) => {
     e.preventDefault();
     setApiKeySaved(true);
@@ -59,32 +78,42 @@ export default function AdminPortal() {
     setTimeout(() => setCacheCleared(false), 2500);
   };
 
-  const handleAddUser = (e) => {
+  const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newUser.username.trim() || !newUser.name.trim()) return;
 
     const initials = newUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'US';
 
-    setUsers([
-      ...users,
-      {
-        id: Date.now(),
-        initials,
-        username: newUser.username,
-        name: newUser.name,
-        email: newUser.email || `${newUser.username}@aura.ai`,
-        role: newUser.role,
-        status: 'Active',
-        last_login: 'Vừa tạo',
-        two_fa: true
-      }
-    ]);
+    const created = {
+      id: Date.now(),
+      initials,
+      username: newUser.username,
+      name: newUser.name,
+      email: newUser.email || `${newUser.username}@aura.ai`,
+      role: newUser.role,
+      status: 'Active',
+      last_login: 'Vừa tạo',
+      two_fa: true
+    };
+
+    setUsers([...users, created]);
     setShowAddUserModal(false);
+    
+    // Persist to DB
+    await createUserApi({
+      username: newUser.username,
+      full_name: newUser.name,
+      email: newUser.email || `${newUser.username}@aura.ai`,
+      role: newUser.role,
+      password_hash: '123456'
+    });
+
     setNewUser({ username: '', name: '', email: '', role: 'Content Creator' });
   };
 
-  const handleDeleteUser = (id) => {
+  const handleDeleteUser = async (id) => {
     setUsers(users.filter(u => u.id !== id));
+    await deleteUserApi(id);
   };
 
   const filteredUsers = users.filter(u => 
