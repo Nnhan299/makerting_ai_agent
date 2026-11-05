@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   AlertTriangle, 
@@ -17,6 +17,12 @@ import {
   Layers,
   X
 } from 'lucide-react';
+
+import { 
+  fetchBrandRules, 
+  createBrandRuleApi, 
+  updateBrandRuleApi 
+} from '../api';
 
 export default function BrandRules() {
   const [activeRuleId, setActiveRuleId] = useState(1);
@@ -65,6 +71,18 @@ export default function BrandRules() {
     }
   ]);
 
+  // Load rules from DB
+  useEffect(() => {
+    async function loadRules() {
+      const dbRules = await fetchBrandRules();
+      if (dbRules && dbRules.length > 0) {
+        setRuleSets(dbRules);
+        setActiveRuleId(dbRules[0].id);
+      }
+    }
+    loadRules();
+  }, []);
+
   const selectedRule = ruleSets.find(r => r.id === activeRuleId) || ruleSets[0];
 
   const handleAddForbidden = (e) => {
@@ -109,7 +127,14 @@ export default function BrandRules() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (selectedRule && selectedRule.id) {
+      await updateBrandRuleApi(selectedRule.id, {
+        forbidden_words: selectedRule.forbidden_words,
+        mandatory_keywords: selectedRule.mandatory_keywords,
+        tone_of_voice: selectedRule.tone_of_voice
+      });
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };

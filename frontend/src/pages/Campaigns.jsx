@@ -35,7 +35,7 @@ export default function Campaigns({ campaigns, setCampaigns, onSelectCampaign, o
     channels: ['TikTok', 'Facebook', 'Instagram']
   });
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
     if (!newCamp.name.trim()) return;
 
@@ -54,7 +54,11 @@ export default function Campaigns({ campaigns, setCampaigns, onSelectCampaign, o
       end_date: '2026-12-31'
     };
 
-    setCampaigns([created, ...campaigns]);
+    if (onApiCreate) {
+      await onApiCreate(created);
+    } else {
+      setCampaigns([created, ...campaigns]);
+    }
     setShowCreateModal(false);
     setNewCamp({
       name: '',
@@ -66,9 +70,13 @@ export default function Campaigns({ campaigns, setCampaigns, onSelectCampaign, o
     });
   };
 
-  const handleDelete = (id, e) => {
+  const handleDelete = async (id, e) => {
     e.stopPropagation();
-    setCampaigns(campaigns.filter(c => c.id !== id));
+    if (onApiDelete) {
+      await onApiDelete(id);
+    } else {
+      setCampaigns(campaigns.filter(c => c.id !== id));
+    }
   };
 
   const filteredCampaigns = campaigns.filter(c => {
