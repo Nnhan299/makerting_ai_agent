@@ -1,23 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Save, 
-  Trash2, 
-  ShieldCheck, 
-  Check, 
-  Search,
-  Sparkles,
-  RefreshCw,
-  FileText,
-  Sliders,
-  History,
-  Activity,
-  Layers,
-  X
-} from 'lucide-react';
-
+import '../brand-rules.css';
 import { 
   fetchBrandRules, 
   createBrandRuleApi, 
@@ -26,240 +8,435 @@ import {
 
 export default function BrandRules() {
   const [activeRuleId, setActiveRuleId] = useState(1);
-  const [newForbiddenWord, setNewForbiddenWord] = useState('');
-  const [newMandatoryWord, setNewMandatoryWord] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [showAddRuleModal, setShowAddRuleModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleDesc, setNewRuleDesc] = useState('');
 
-  // Live test input state
-  const [testText, setTestText] = useState('Serum PureGlow cam kết 100% trị dứt điểm kích ứng da chỉ sau 7 ngày!');
-  const [testResult, setTestResult] = useState(null);
-
+  // Default rich rule sets matching user's HTML specification
   const [ruleSets, setRuleSets] = useState([
     {
       id: 1,
-      name: 'Quy định Dược Mỹ phẩm VN 2026',
-      code: 'RULE-COSMETIC-VN',
-      status: 'Active',
-      description: 'Bộ quy tắc chuẩn hóa theo Bộ Y tế & Luật Dược. Tự động gắn cờ vi phạm cam kết tuyệt đối hóa.',
-      forbidden_words: ['cam kết 100%', 'chữa khỏi hoàn toàn', 'đặc trị vĩnh viễn', 'số 1 Việt Nam', 'thần dược', 'trị dứt điểm'],
-      mandatory_keywords: ['PureGlow', 'Serum B5', 'Phục hồi da', 'Đã kiểm nghiệm da liễu', 'Khoa học làn da', 'An toàn dịu nhẹ'],
-      tone_of_voice: 'Chuyên gia & Thân thiện',
+      code: 'RULE-BRD-01',
+      name: 'Quy tắc Quảng cáo Việt Nam',
+      status: 'Standby',
+      description: 'Kiểm định từ ngữ tuyệt đối hóa theo Luật Quảng cáo số 16/2012/QH13 & Nghị định 38/2021.',
+      scope: 'Facebook Ads, TikTok Shop, Landing Page',
+      forbidden_list: [
+        { word: 'tốt nhất', suggest: 'tối ưu' },
+        { word: 'số 1', suggest: 'hàng đầu' },
+        { word: 'duy nhất', suggest: 'chuyên biệt' },
+        { word: 'cam kết', suggest: 'hỗ trợ' },
+        { word: 'đảm bảo 100%', suggest: 'hiệu quả kiểm nghiệm' },
+        { word: 'cam kết 100%', suggest: 'hỗ trợ phục hồi rõ rệt' },
+        { word: 'trị dứt điểm', suggest: 'làm dịu chuyên sâu' }
+      ],
+      mandatory_list: [
+        { word: 'PureGlow', type: 'Brand' },
+        { word: 'Serum B5', type: 'Hoạt chất' },
+        { word: 'Phục hồi da', type: 'Công dụng' }
+      ],
+      tone_of_voice: 'expert-friendly',
       compliance_threshold: 88
     },
     {
       id: 2,
-      name: 'Tone of Voice Tinh tế & Chuyên gia',
-      code: 'RULE-TONE-EXPERT',
-      status: 'Standby',
-      description: 'Dành riêng cho Whitepaper, Bác sĩ da liễu và các bài viết học thuật chuyên sâu.',
-      forbidden_words: ['rẻ nhất', 'giá sốc', 'ôm hàng', 'cháy hàng', 'nhanh tay'],
-      mandatory_keywords: ['Bác sĩ khuyên dùng', 'Chăm sóc khoa học', 'Củng cố màng ẩm', 'Nghiên cứu lâm sàng'],
-      tone_of_voice: 'Tinh tế, Điềm đạm & Sang trọng',
-      compliance_threshold: 90
-    },
-    {
-      id: 3,
-      name: 'Chiến dịch TikTok Viral GenZ',
-      code: 'RULE-TIKTOK-GENZ',
+      code: 'RULE-BRD-02',
+      name: 'Quy tắc ngành Mỹ phẩm & Dược mỹ phẩm',
       status: 'Active',
-      description: 'Ngôn từ năng động, hạn chế biệt ngữ y khoa nặng nề, tập trung trải nghiệm 7 ngày mộc da.',
-      forbidden_words: ['trước sau', 'before after', 'lột xác', 'giảm cân cấp tốc'],
-      mandatory_keywords: ['Hiệu quả thực tế', 'Phù hợp mọi loại da', 'Glowy skin', 'Routine sáng da'],
-      tone_of_voice: 'Trẻ trung, Năng lượng & Gần gũi',
-      compliance_threshold: 80
+      description: 'Kiểm soát tuyên bố công dụng (Cosmetic Claims), tránh gây hiểu nhầm sản phẩm là thuốc điều trị.',
+      scope: 'Tất cả bài đăng & Kịch bản Video',
+      forbidden_list: [
+        { word: 'chữa khỏi hoàn toàn', suggest: 'hỗ trợ cải thiện' },
+        { word: 'đặc trị vĩnh viễn', suggest: 'chăm sóc chuyên sâu' },
+        { word: 'thần dược', suggest: 'tinh chất phục hồi' },
+        { word: 'trị dứt điểm', suggest: 'giảm thiểu rõ rệt' },
+        { word: 'khỏi mụn sau 24h', suggest: 'hỗ trợ gom cồi mụn' },
+        { word: 'tận gốc', suggest: 'chăm sóc tận màng ẩm' },
+        { word: 'cam kết 100%', suggest: 'được kiểm nghiệm da liễu' }
+      ],
+      mandatory_list: [
+        { word: 'PureGlow', type: 'Brand' },
+        { word: 'Đã kiểm nghiệm da liễu', type: 'Chứng nhận' }
+      ],
+      tone_of_voice: 'clinical',
+      compliance_threshold: 90
     }
   ]);
 
-  // Load rules from DB
-  useEffect(() => {
-    async function loadRules() {
-      const dbRules = await fetchBrandRules();
-      if (dbRules && dbRules.length > 0) {
-        setRuleSets(dbRules);
-        setActiveRuleId(dbRules[0].id);
-      }
-    }
-    loadRules();
-  }, []);
+  // Form input states for adding keywords
+  const [forbiddenInput, setForbiddenInput] = useState('');
+  const [replacementInput, setReplacementInput] = useState('');
+  const [mandatoryInput, setMandatoryInput] = useState('');
 
+  // Live Tester State
+  const [complianceText, setComplianceText] = useState('Serum PureGlow cam kết 100% trị dứt điểm kích ứng da chỉ sau 7 ngày!');
+  const [scanResult, setScanResult] = useState({
+    scanned: true,
+    score: 54,
+    passed: false,
+    violations: ['cam kết 100%', 'trị dứt điểm'],
+    matchedMandatory: ['PureGlow'],
+    missingMandatory: ['Serum B5', 'Phục hồi da'],
+    rewrite: 'PureGlow Serum B5 hỗ trợ làm dịu kích ứng và phục hồi da hiệu quả, cảm nhận làn da khỏe hơn sau 7 ngày sử dụng.'
+  });
+
+  // Selected Rule helper
   const selectedRule = ruleSets.find(r => r.id === activeRuleId) || ruleSets[0];
 
-  const handleAddForbidden = (e) => {
-    e.preventDefault();
-    if (!newForbiddenWord.trim()) return;
-    setRuleSets(prev => prev.map(r => {
-      if (r.id === activeRuleId && !r.forbidden_words.includes(newForbiddenWord.trim())) {
-        return { ...r, forbidden_words: [...r.forbidden_words, newForbiddenWord.trim()] };
-      }
-      return r;
-    }));
-    setNewForbiddenWord('');
-  };
+  // Load from DB on mount
+  useEffect(() => {
+    async function loadDbRules() {
+      const dbRules = await fetchBrandRules();
+      if (dbRules && dbRules.length > 0) {
+        // Merge DB data with rich frontend structure
+        setRuleSets(prev => {
+          const merged = [...prev];
+          dbRules.forEach(dbr => {
+            const existingIdx = merged.findIndex(r => r.id === dbr.id || r.name === dbr.name);
+            const fbWords = Array.isArray(dbr.forbidden_words) 
+              ? dbr.forbidden_words 
+              : (dbr.forbidden_words || '').split(',').map(w => w.trim()).filter(Boolean);
+            const mdWords = Array.isArray(dbr.mandatory_keywords)
+              ? dbr.mandatory_keywords
+              : (dbr.mandatory_keywords || '').split(',').map(w => w.trim()).filter(Boolean);
 
-  const handleRemoveForbidden = (word) => {
-    setRuleSets(prev => prev.map(r => {
-      if (r.id === activeRuleId) {
-        return { ...r, forbidden_words: r.forbidden_words.filter(w => w !== word) };
-      }
-      return r;
-    }));
-  };
+            const ruleObj = {
+              id: dbr.id,
+              code: dbr.code || `RULE-BRD-${String(dbr.id).padStart(2, '0')}`,
+              name: dbr.name || dbr.rule_name || 'Quy tắc thương hiệu',
+              status: dbr.status || 'Active',
+              description: dbr.description || `Bộ quy tắc chuẩn thương hiệu ${dbr.name}`,
+              scope: 'Facebook Ads, TikTok Shop, Landing Page',
+              forbidden_list: fbWords.map(w => ({ word: w, suggest: 'tối ưu an toàn' })),
+              mandatory_list: mdWords.map(w => ({ word: w, type: 'Brand' })),
+              tone_of_voice: dbr.tone_of_voice || 'expert-friendly',
+              compliance_threshold: dbr.compliance_threshold || 88
+            };
 
-  const handleAddMandatory = (e) => {
-    e.preventDefault();
-    if (!newMandatoryWord.trim()) return;
-    setRuleSets(prev => prev.map(r => {
-      if (r.id === activeRuleId && !r.mandatory_keywords.includes(newMandatoryWord.trim())) {
-        return { ...r, mandatory_keywords: [...r.mandatory_keywords, newMandatoryWord.trim()] };
+            if (existingIdx >= 0) {
+              merged[existingIdx] = { ...merged[existingIdx], ...ruleObj };
+            } else {
+              merged.push(ruleObj);
+            }
+          });
+          return merged;
+        });
       }
-      return r;
-    }));
-    setNewMandatoryWord('');
-  };
-
-  const handleRemoveMandatory = (word) => {
-    setRuleSets(prev => prev.map(r => {
-      if (r.id === activeRuleId) {
-        return { ...r, mandatory_keywords: r.mandatory_keywords.filter(w => w !== word) };
-      }
-      return r;
-    }));
-  };
-
-  const handleSave = async () => {
-    if (selectedRule && selectedRule.id) {
-      await updateBrandRuleApi(selectedRule.id, {
-        forbidden_words: selectedRule.forbidden_words,
-        mandatory_keywords: selectedRule.mandatory_keywords,
-        tone_of_voice: selectedRule.tone_of_voice
-      });
     }
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
-  };
+    loadDbRules();
+  }, []);
 
-  // Run live compliance check on testText
-  const handleRunLiveTest = () => {
-    const foundForbidden = selectedRule.forbidden_words.filter(w => 
-      testText.toLowerCase().includes(w.toLowerCase())
-    );
-    const foundMandatory = selectedRule.mandatory_keywords.filter(w => 
-      testText.toLowerCase().includes(w.toLowerCase())
-    );
+  // Run Real-time scanner whenever text or selected rule changes
+  const runComplianceScan = (textToScan = complianceText) => {
+    const textLower = textToScan.toLowerCase();
+    const foundForbidden = [];
+    selectedRule.forbidden_list.forEach(item => {
+      if (textLower.includes(item.word.toLowerCase())) {
+        foundForbidden.push(item.word);
+      }
+    });
+
+    const matchedMandatory = [];
+    const missingMandatory = [];
+    selectedRule.mandatory_list.forEach(item => {
+      if (textLower.includes(item.word.toLowerCase())) {
+        matchedMandatory.push(item.word);
+      } else {
+        missingMandatory.push(item.word);
+      }
+    });
 
     let score = 100;
-    score -= foundForbidden.length * 15;
-    if (foundMandatory.length === 0) score -= 10;
-    score = Math.max(0, Math.min(100, score));
+    score -= foundForbidden.length * 20;
+    score -= missingMandatory.length * 8;
+    score = Math.max(20, Math.min(100, score));
 
-    setTestResult({
+    const passed = score >= selectedRule.compliance_threshold;
+
+    // AI Safe Rewrite generator
+    let rewritten = textToScan;
+    selectedRule.forbidden_list.forEach(item => {
+      if (rewritten.toLowerCase().includes(item.word.toLowerCase())) {
+        const regex = new RegExp(item.word, 'gi');
+        rewritten = rewritten.replace(regex, item.suggest || 'hỗ trợ an toàn');
+      }
+    });
+
+    setScanResult({
+      scanned: true,
       score,
+      passed,
       violations: foundForbidden,
-      matches: foundMandatory,
-      passed: score >= selectedRule.compliance_threshold
+      matchedMandatory,
+      missingMandatory,
+      rewrite: rewritten !== textToScan 
+        ? rewritten 
+        : 'PureGlow Serum B5 hỗ trợ làm dịu kích ứng và phục hồi da hiệu quả, cảm nhận làn da khỏe hơn sau 7 ngày sử dụng.'
     });
   };
 
+  // Toggle active status
+  const handleToggleStatus = async () => {
+    const newStatus = selectedRule.status === 'Active' ? 'Standby' : 'Active';
+    setRuleSets(prev => prev.map(r => r.id === activeRuleId ? { ...r, status: newStatus } : r));
+    if (selectedRule.id) {
+      await updateBrandRuleApi(selectedRule.id, {
+        rule_name: selectedRule.name,
+        forbidden_words: selectedRule.forbidden_list.map(f => f.word).join(', '),
+        mandatory_keywords: selectedRule.mandatory_list.map(m => m.word).join(', '),
+        status: newStatus
+      });
+    }
+  };
+
+  // Add Forbidden word
+  const handleAddForbidden = (e) => {
+    e.preventDefault();
+    if (!forbiddenInput.trim()) return;
+    const newWord = forbiddenInput.trim();
+    const newSuggest = replacementInput.trim() || 'tối ưu';
+
+    setRuleSets(prev => prev.map(r => {
+      if (r.id === activeRuleId) {
+        return {
+          ...r,
+          forbidden_list: [...r.forbidden_list, { word: newWord, suggest: newSuggest }]
+        };
+      }
+      return r;
+    }));
+
+    setForbiddenInput('');
+    setReplacementInput('');
+    setTimeout(() => runComplianceScan(), 100);
+  };
+
+  // Remove Forbidden word
+  const handleRemoveForbidden = (wordToRemove) => {
+    setRuleSets(prev => prev.map(r => {
+      if (r.id === activeRuleId) {
+        return {
+          ...r,
+          forbidden_list: r.forbidden_list.filter(f => f.word !== wordToRemove)
+        };
+      }
+      return r;
+    }));
+    setTimeout(() => runComplianceScan(), 100);
+  };
+
+  // Add Mandatory keyword
+  const handleAddMandatory = (e) => {
+    e.preventDefault();
+    if (!mandatoryInput.trim()) return;
+    const newKw = mandatoryInput.trim();
+
+    setRuleSets(prev => prev.map(r => {
+      if (r.id === activeRuleId) {
+        return {
+          ...r,
+          mandatory_list: [...r.mandatory_list, { word: newKw, type: 'Thuật ngữ' }]
+        };
+      }
+      return r;
+    }));
+
+    setMandatoryInput('');
+    setTimeout(() => runComplianceScan(), 100);
+  };
+
+  // Remove Mandatory keyword
+  const handleRemoveMandatory = (kwToRemove) => {
+    setRuleSets(prev => prev.map(r => {
+      if (r.id === activeRuleId) {
+        return {
+          ...r,
+          mandatory_list: r.mandatory_list.filter(m => m.word !== kwToRemove)
+        };
+      }
+      return r;
+    }));
+    setTimeout(() => runComplianceScan(), 100);
+  };
+
+  // Update Score Threshold
+  const handleThresholdChange = (val) => {
+    setRuleSets(prev => prev.map(r => r.id === activeRuleId ? { ...r, compliance_threshold: Number(val) } : r));
+  };
+
+  // Update Tone
+  const handleToneChange = (val) => {
+    setRuleSets(prev => prev.map(r => r.id === activeRuleId ? { ...r, tone_of_voice: val } : r));
+  };
+
+  // Export JSON configuration
+  const handleExportJSON = () => {
+    const configData = {
+      project: 'AuraAI Marketing Intelligence',
+      version: '2.4',
+      exported_at: new Date().toISOString(),
+      rule: selectedRule
+    };
+    const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AuraAI_BrandRule_${selectedRule.code}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+  };
+
+  // Apply to DB
+  const handleApplyToSystem = async () => {
+    setSavedSuccess(true);
+    if (selectedRule.id) {
+      await updateBrandRuleApi(selectedRule.id, {
+        rule_name: selectedRule.name,
+        forbidden_words: selectedRule.forbidden_list.map(f => f.word).join(', '),
+        mandatory_keywords: selectedRule.mandatory_list.map(m => m.word).join(', '),
+        tone_of_voice: selectedRule.tone_of_voice,
+        compliance_threshold: selectedRule.compliance_threshold
+      });
+    }
+    setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  // Create new rule
+  const handleCreateRule = async (e) => {
+    e.preventDefault();
+    if (!newRuleName.trim()) return;
+
+    const newRule = {
+      id: Date.now(),
+      code: `RULE-BRD-${String(ruleSets.length + 1).padStart(2, '0')}`,
+      name: newRuleName.trim(),
+      status: 'Active',
+      description: newRuleDesc.trim() || `Bộ quy tắc thương hiệu ${newRuleName.trim()}`,
+      scope: 'Toàn bộ kênh phân phối',
+      forbidden_list: [
+        { word: 'cam kết 100%', suggest: 'được chứng minh' },
+        { word: 'trị dứt điểm', suggest: 'hỗ trợ cải thiện' }
+      ],
+      mandatory_list: [
+        { word: 'PureGlow', type: 'Brand' }
+      ],
+      tone_of_voice: 'expert-friendly',
+      compliance_threshold: 88
+    };
+
+    setRuleSets([...ruleSets, newRule]);
+    setActiveRuleId(newRule.id);
+    setShowAddModal(false);
+    setNewRuleName('');
+    setNewRuleDesc('');
+
+    await createBrandRuleApi({
+      rule_name: newRule.name,
+      forbidden_words: 'cam kết 100%, trị dứt điểm',
+      mandatory_keywords: 'PureGlow',
+      tone_of_voice: 'Chuyên gia & Thân thiện'
+    });
+  };
+
+  // Calculate words and chars for counter
+  const wordCount = complianceText.trim() ? complianceText.trim().split(/\s+/).length : 0;
+  const charCount = complianceText.length;
+
   return (
-    <div className="space-y-6">
-      
-      {/* ------------------------------------------------------------ */}
-      {/* TOP HEADER: BRAND RULES & GOVERNANCE                         */}
-      {/* ------------------------------------------------------------ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200/80">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#3525CD] font-bold uppercase tracking-wider mb-1">
-            <span>Brand Rules & Compliance Governance</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-            <span className="text-slate-500 font-normal">SRS 3.2 · BRD-01..04</span>
+    <div className="brd-page-container">
+
+      {/* PAGE HEADER */}
+      <section className="page-header">
+        <div className="page-header-left">
+          <div className="eyebrow">
+            <span>BRAND RULES &amp; COMPLIANCE GOVERNANCE</span>
+            <span className="eyebrow-sep">&bull;</span>
+            <span className="mono-text">SRS 3.2 &middot; BRD-01..04</span>
           </div>
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Bộ Quy Tắc Thương Hiệu
-            </h1>
-            <span className="text-xs text-slate-500 hidden sm:inline">
-              Kiểm soát thuật toán từ cấm, ngữ nghĩa pháp lý Dược phẩm và Tone of Voice đa kênh
-            </span>
-          </div>
+          <h1 className="page-title">Bộ Quy Tắc Thương Hiệu</h1>
+          <p className="page-subtitle">
+            Kiểm soát thuật toán từ cấm, ngữ nghĩa pháp lý Dược phẩm và Tone of Voice đa kênh
+          </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-1.5 bg-[#EAEDFF] px-3 py-1.5 rounded-lg text-xs font-mono font-medium text-slate-800">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Neural Guard v4.8: Active</span>
+        <div className="page-header-actions">
+          <div className="engine-badge">
+            <span className="status-dot dot-green"></span>
+            <span className="mono-text">Neural Guard v4.8: Active</span>
           </div>
+          
+          <button className="btn btn-secondary" type="button" onClick={handleExportJSON}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>Xuất cấu hình JSON</span>
+          </button>
 
-          <button 
-            onClick={handleSave}
-            className="inline-flex items-center gap-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-1.5 rounded-lg font-semibold text-xs shadow-xs transition active:scale-95"
-          >
-            {savedSuccess ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-            <span>{savedSuccess ? 'Đã lưu toàn hệ thống ✓' : 'Áp dụng toàn hệ thống'}</span>
+          <button className="btn btn-primary" type="button" onClick={handleApplyToSystem}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <span>{savedSuccess ? 'Đã áp dụng vào DB ✓' : 'Áp dụng toàn hệ thống'}</span>
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* ------------------------------------------------------------ */}
-      {/* MAIN LAYOUT: LEFT RULE-SET LIST & RIGHT RULE EDITOR          */}
-      {/* ------------------------------------------------------------ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left 4 Cols: Rule Sets & Performance Cards */}
-        <div className="lg:col-span-4 space-y-4">
-          
-          {/* Rule Sets Container */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between pb-1">
-              <span className="text-xs font-bold text-slate-700 uppercase font-mono tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#3525CD]" />
-                BỘ QUY TẮC THƯƠNG HIỆU
-              </span>
-              <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                {ruleSets.length} bộ lọc
-              </span>
+      {/* WORKSPACE GRID */}
+      <div className="workspace-grid">
+
+        {/* LEFT SIDEBAR */}
+        <aside className="sidebar">
+
+          {/* Rule Sets Card */}
+          <div className="panel">
+            <div className="panel-header">
+              <div className="panel-title-group">
+                <svg className="icon-brand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <h2 className="panel-title-sm">BỘ QUY TẮC THƯƠNG HIỆU</h2>
+              </div>
+              <span className="badge badge-neutral">{ruleSets.length} bộ lọc</span>
             </div>
 
-            {/* List of Rule Sets */}
-            <div className="space-y-2">
+            <div className="rule-list">
               {ruleSets.map(rule => {
                 const isSelected = rule.id === activeRuleId;
+                const isActiveStatus = rule.status === 'Active';
                 return (
-                  <div
-                    key={rule.id}
+                  <div 
+                    key={rule.id} 
+                    className={`rule-card ${isSelected ? 'selected' : ''}`}
                     onClick={() => setActiveRuleId(rule.id)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                      isSelected 
-                        ? 'bg-[#EAEDFF] border-[#3525CD] shadow-xs' 
-                        : 'bg-white border-slate-200/80 hover:bg-slate-50'
-                    }`}
+                    tabIndex={0}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h4 className="font-bold text-slate-900 text-xs leading-snug">
-                        {rule.name}
-                      </h4>
-                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                        rule.status === 'Active' 
-                          ? 'bg-emerald-100 text-emerald-800' 
-                          : 'bg-slate-200 text-slate-700'
-                      }`}>
+                    <div className="rule-card-top">
+                      <span className="rule-id mono-text">{rule.code}</span>
+                      <span className={`badge ${isActiveStatus ? 'badge-success' : 'badge-warning'}`}>
                         {rule.status}
                       </span>
                     </div>
-
-                    <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mb-2">
-                      {rule.description}
-                    </p>
-
-                    <div className="flex items-center gap-3 text-[11px] font-mono text-slate-600 pt-1.5 border-t border-slate-200/60">
-                      <span className="flex items-center gap-1 text-red-600 font-semibold">
-                        <AlertTriangle className="w-3 h-3" />
-                        {rule.forbidden_words.length} từ cấm
+                    <h3 className="rule-name">{rule.name}</h3>
+                    <p className="rule-desc">{rule.description}</p>
+                    <div className="rule-metrics">
+                      <span className="metric-item metric-danger">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        {rule.forbidden_list.length} từ cấm
                       </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-                        <CheckCircle2 className="w-3 h-3" />
-                        {rule.mandatory_keywords.length} từ khóa
+                      <span className="metric-sep">&bull;</span>
+                      <span className="metric-item metric-success">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                          <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        {rule.mandatory_list.length} từ khóa
                       </span>
                     </div>
                   </div>
@@ -267,297 +444,490 @@ export default function BrandRules() {
               })}
             </div>
 
-            <button 
-              onClick={() => {
-                const newId = Date.now();
-                const newRule = {
-                  id: newId,
-                  name: 'Quy tắc Mùa Sự Kiện Mới',
-                  code: `RULE-EVT-${newId.toString().slice(-4)}`,
-                  status: 'Active',
-                  description: 'Bộ quy tắc tùy biến cho các đợt phát động chiến dịch tiếp thị ngắn hạn.',
-                  forbidden_words: ['cam đoan', 'cam kết 100%'],
-                  mandatory_keywords: ['Ưu đãi giới hạn', 'Chính hãng'],
-                  tone_of_voice: 'Hào hứng & Thúc giục',
-                  compliance_threshold: 85
-                };
-                setRuleSets([...ruleSets, newRule]);
-                setActiveRuleId(newId);
-              }}
-              className="w-full py-2 bg-[#F2F3FF] hover:bg-indigo-100 text-[#3525CD] rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition border border-indigo-200"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Thêm bộ quy tắc mới</span>
+            <button className="btn-add-rule" type="button" onClick={() => setShowAddModal(true)}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>Thêm bộ quy tắc mới</span>
             </button>
           </div>
 
-          {/* Performance Card: Hiệu suất Guardrail */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900">Hiệu suất Guardrail</span>
-              <Activity className="w-4 h-4 text-emerald-600" />
+          {/* Guardrail Performance Card */}
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="panel-title-base">Hiệu suất Guardrail</h2>
+              <svg className="icon-success" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F3FF] font-mono text-xs">
-              <div>
-                <span className="text-[10px] text-slate-500 block">Lượt quét 24h</span>
-                <span className="text-lg font-bold text-slate-900">1,482</span>
+            <div className="stats-box">
+              <div className="stats-col">
+                <span className="stats-label">Lượt quét 24h</span>
+                <strong className="stats-value mono-text">1,482</strong>
               </div>
-              <div className="text-right">
-                <span className="text-emerald-700 font-bold block text-sm">✔ 99.4%</span>
-                <span className="text-[10px] text-slate-500">Tuân thủ hoàn toàn</span>
+              <div className="stats-col stats-col-right">
+                <span className="stats-rate mono-text">&#10003; 99.4%</span>
+                <span className="stats-sub">Tuân thủ hoàn toàn</span>
               </div>
             </div>
 
-            <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#3525CD]" />
+            <div className="stats-breakdown">
+              <div className="breakdown-row">
+                <span>Tự động viết lại an toàn</span>
+                <strong className="mono-text">142 bản thảo</strong>
+              </div>
+              <div className="breakdown-row">
+                <span>Chặn vi phạm nghiêm trọng</span>
+                <strong className="mono-text text-danger">9 bản thảo</strong>
+              </div>
+            </div>
+
+            <div className="engine-footer mono-text">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"/>
+              </svg>
               <span>LLM Engine: Gemini 1.5 Pro + Regulatory VectorDB</span>
             </div>
           </div>
 
-          {/* Compliance Doc Reference Card */}
-          <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-indigo-900 to-slate-900 p-4 text-white space-y-2 shadow-xs">
-            <div className="text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-widest">
-              BRD-COMPLIANCE-DOC
-            </div>
-            <h4 className="text-sm font-bold leading-snug">
-              Bộ quy chuẩn Dược Mỹ Phẩm 2026
-            </h4>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              Tự động đồng bộ và cập nhật danh mục từ ngữ vi phạm cùng Cục Quản lý Dược Việt Nam.
+          {/* Compliance Doc Promo Card */}
+          <div className="compliance-banner">
+            <div className="banner-eyebrow mono-text">BRD-COMPLIANCE-DOC</div>
+            <h3 className="banner-title">Bộ quy chuẩn Dược Mỹ Phẩm 2026</h3>
+            <p className="banner-desc">
+              Tự động đồng bộ và cập nhật danh mục từ ngữ vi phạm cùng Cục Quản lý Dược Việt Nam (DAV).
             </p>
+            <div className="banner-footer">
+              <span className="mono-text">Cập nhật: Hôm nay, 08:30</span>
+              <a href="#" className="banner-link">Xem tài liệu &rarr;</a>
+            </div>
           </div>
 
-        </div>
+        </aside>
 
-        {/* Right 8 Cols: Detailed Rule Editor & Live Tester */}
-        <div className="lg:col-span-8 space-y-5">
-          
-          {/* Editor Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-6">
-            
-            {/* Header info */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+        {/* RIGHT MAIN WORKSPACE */}
+        <div className="main-content">
+
+          {/* RULE CONFIGURATION PANEL */}
+          <section className="panel config-panel">
+            {/* Config Header */}
+            <div className="config-header">
               <div>
-                <div className="text-[10px] font-mono font-bold text-[#3525CD] uppercase tracking-wider">
-                  BRD-01: {selectedRule.status.toUpperCase()}
+                <div className="config-meta">
+                  <span className="badge badge-warning-outline mono-text">
+                    {selectedRule.code} &bull; {selectedRule.status.toUpperCase()}
+                  </span>
+                  <span className="meta-scope">Áp dụng: {selectedRule.scope || 'Toàn bộ chiến dịch'}</span>
                 </div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  Cấu hình {selectedRule.name}
-                </h2>
+                <h2 className="config-title">Cấu hình {selectedRule.name}</h2>
               </div>
-              <div className="text-xs font-mono text-slate-500">
-                Mã định danh: <strong className="text-slate-800">{selectedRule.code}</strong>
+
+              <div className="config-header-controls">
+                <label className="toggle-control" htmlFor="ruleActiveToggle">
+                  <span className="toggle-label">Kích hoạt bộ lọc</span>
+                  <input 
+                    type="checkbox" 
+                    id="ruleActiveToggle" 
+                    checked={selectedRule.status === 'Active'}
+                    onChange={handleToggleStatus}
+                  />
+                  <span className="toggle-Track"></span>
+                </label>
               </div>
             </div>
 
-            {/* Negative Keywords (Blacklist / Từ cấm) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                    Từ Cấm Tuyệt Đối (Negative Keywords / Blacklist)
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Khi xuất hiện trong bản thảo, hệ thống sẽ báo đỏ và tự động gợi ý từ thay thế an toàn.
+            <hr className="section-divider" />
+
+            {/* SECTION 1: NEGATIVE KEYWORDS / BLACKLIST */}
+            <div className="rule-section">
+              <div className="section-head">
+                <div className="section-head-left">
+                  <div className="section-title-row">
+                    <span className="icon-badge icon-badge-danger">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                    </span>
+                    <h3 className="section-title">Từ Cấm Tuyệt Đối (Negative Keywords / Blacklist)</h3>
+                  </div>
+                  <p className="section-subtitle">
+                    Khi xuất hiện trong bản thảo, hệ thống sẽ báo đỏ và tự động gợi ý cụm từ thay thế hợp lệ.
                   </p>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
-                  {selectedRule.forbidden_words.length} từ bị chặn
+                <span className="badge badge-danger-soft mono-text">
+                  {selectedRule.forbidden_list.length} từ bị chặn
                 </span>
               </div>
 
-              {/* Tag Pills */}
-              <div className="flex flex-wrap gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200/80 min-h-[50px]">
-                {selectedRule.forbidden_words.map(word => (
-                  <span 
-                    key={word}
-                    className="inline-flex items-center gap-1.5 bg-red-100/90 text-red-800 border border-red-300 text-xs font-semibold px-2.5 py-1 rounded-lg shadow-2xs"
-                  >
-                    <span>{word}</span>
+              {/* Tag Box with Replacement Logic */}
+              <div className="tag-container tag-container-danger" id="blacklistContainer">
+                {selectedRule.forbidden_list.map((item, idx) => (
+                  <div key={idx} className="keyword-chip chip-danger">
+                    <span className="chip-Forbidden">{item.word}</span>
+                    <span className="chip-arrow">&rarr;</span>
+                    <span className="chip-suggest">{item.suggest || 'tối ưu'}</span>
                     <button 
-                      onClick={() => handleRemoveForbidden(word)}
-                      className="hover:text-red-950 font-bold"
+                      type="button" 
+                      className="chip-remove" 
+                      aria-label="Xóa"
+                      onClick={() => handleRemoveForbidden(item.word)}
                     >
-                      <X className="w-3 h-3" />
+                      &times;
                     </button>
-                  </span>
+                  </div>
                 ))}
               </div>
 
-              {/* Add form */}
-              <form onSubmit={handleAddForbidden} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nhập cụm từ cấm cần bổ sung (Ví dụ: cam kết 100%, khỏi hoàn toàn)..."
-                  value={newForbiddenWord}
-                  onChange={(e) => setNewForbiddenWord(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-xs transition active:scale-95"
-                >
+              {/* Logical Dual Input Row */}
+              <form onSubmit={handleAddForbidden} className="input-group-row">
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    id="forbiddenInput"
+                    className="form-input"
+                    value={forbiddenInput}
+                    onChange={(e) => setForbiddenInput(e.target.value)}
+                    placeholder="Nhập cụm từ cấm (VD: trị dứt điểm, khỏi hoàn toàn)..."
+                  />
+                </div>
+                <div className="input-wrapper input-wrapper-sm">
+                  <input
+                    type="text"
+                    id="replacementInput"
+                    className="form-input"
+                    value={replacementInput}
+                    onChange={(e) => setReplacementInput(e.target.value)}
+                    placeholder="Từ thay thế an toàn (VD: làm dịu da)..."
+                  />
+                </div>
+                <button className="btn btn-danger" type="submit" id="addForbiddenBtn">
                   + Thêm từ cấm
                 </button>
               </form>
             </div>
 
-            {/* Mandatory Keywords (Whitelist / Từ bắt buộc) */}
-            <div className="space-y-3 pt-3 border-t border-slate-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Từ Khóa Bắt Buộc (Mandatory Keywords)
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Các thuật ngữ khoa học và nhận diện thương hiệu cần có trong ít nhất 1 bài viết phễu Launch.
+            <hr className="section-divider" />
+
+            {/* SECTION 2: MANDATORY KEYWORDS */}
+            <div className="rule-section">
+              <div className="section-head">
+                <div className="section-head-left">
+                  <div className="section-title-row">
+                    <span className="icon-badge icon-badge-success">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                    </span>
+                    <h3 className="section-title">Từ Khóa Bắt Buộc (Mandatory Keywords)</h3>
+                  </div>
+                  <p className="section-subtitle">
+                    Các thuật ngữ khoa học và nhận diện thương hiệu cần xuất hiện ít nhất 1 lần trong bài viết phễu Launch.
                   </p>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  {selectedRule.mandatory_keywords.length} từ khóa
+                <span className="badge badge-success-soft mono-text">
+                  {selectedRule.mandatory_list.length} từ khóa
                 </span>
               </div>
 
-              {/* Tag Pills */}
-              <div className="flex flex-wrap gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200/80 min-h-[50px]">
-                {selectedRule.mandatory_keywords.map(word => (
-                  <span 
-                    key={word}
-                    className="inline-flex items-center gap-1.5 bg-emerald-100/90 text-emerald-800 border border-emerald-300 text-xs font-semibold px-2.5 py-1 rounded-lg shadow-2xs"
-                  >
-                    <span>{word}</span>
+              <div className="tag-container tag-container-success" id="mandatoryContainer">
+                {selectedRule.mandatory_list.map((item, idx) => (
+                  <div key={idx} className="keyword-chip chip-success">
+                    <span>{item.word}</span>
+                    <span className="chip-tag-type">{item.type || 'Thuật ngữ'}</span>
                     <button 
-                      onClick={() => handleRemoveMandatory(word)}
-                      className="hover:text-emerald-950 font-bold"
+                      type="button" 
+                      className="chip-remove" 
+                      aria-label="Xóa"
+                      onClick={() => handleRemoveMandatory(item.word)}
                     >
-                      <X className="w-3 h-3" />
+                      &times;
                     </button>
-                  </span>
+                  </div>
                 ))}
               </div>
 
-              {/* Add form */}
-              <form onSubmit={handleAddMandatory} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nhập từ khóa bắt buộc cần bổ sung (Ví dụ: PureGlow, Serum B5)..."
-                  value={newMandatoryWord}
-                  onChange={(e) => setNewMandatoryWord(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition active:scale-95"
-                >
+              <form onSubmit={handleAddMandatory} className="input-group-row">
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    id="mandatoryInput"
+                    className="form-input"
+                    value={mandatoryInput}
+                    onChange={(e) => setMandatoryInput(e.target.value)}
+                    placeholder="Nhập từ khóa bắt buộc cần bổ sung (Ví dụ: Panthenol 5%, Cấp ẩm sâu)..."
+                  />
+                </div>
+                <button className="btn btn-success" type="submit" id="addMandatoryBtn">
                   + Thêm từ khóa
                 </button>
               </form>
             </div>
 
-            {/* Tone of Voice & Compliance Threshold */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold text-slate-800">Giọng Điệu Thương Hiệu (Tone of Voice)</label>
-                <select
-                  value={selectedRule.tone_of_voice}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setRuleSets(prev => prev.map(r => r.id === activeRuleId ? { ...r, tone_of_voice: val } : r));
-                  }}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="Chuyên gia & Thân thiện">Chuyên gia & Thân thiện</option>
-                  <option value="Tinh tế, Điềm đạm & Sang trọng">Tinh tế, Điềm đạm & Sang trọng</option>
-                  <option value="Trẻ trung, Năng lượng & Gần gũi">Trẻ trung, Năng lượng & Gần gũi</option>
-                  <option value="Khoa học Y khoa Chuyên sâu">Khoa học Y khoa Chuyên sâu</option>
-                </select>
+            <hr className="section-divider" />
+
+            {/* SECTION 3: TONE OF VOICE & THRESHOLD SCORE */}
+            <div className="parameters-grid">
+              <div className="param-box">
+                <label className="param-label" htmlFor="toneSelect">
+                  Giọng Điệu Thương Hiệu (Tone of Voice)
+                </label>
+                <div className="select-wrapper">
+                  <select 
+                    id="toneSelect" 
+                    className="form-select"
+                    value={selectedRule.tone_of_voice || 'expert-friendly'}
+                    onChange={(e) => handleToneChange(e.target.value)}
+                  >
+                    <option value="expert-friendly">Chuyên gia &amp; Thân thiện (Dermatological &amp; Empathetic)</option>
+                    <option value="clinical">Khoa học Lâm sàng (Clinical &amp; Evidence-based)</option>
+                    <option value="luxury">Cao cấp &amp; Tinh tế (Premium Skincare)</option>
+                    <option value="genz">Trẻ trung &amp; Năng động (Gen Z Social)</option>
+                  </select>
+                </div>
+                <span className="param-hint">Định hướng văn phong khi AI tự động viết lại câu vi phạm.</span>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="font-bold text-slate-800">Điểm Đạt Chuẩn Tối Thiểu</label>
-                  <span className="font-mono font-bold text-indigo-600">{selectedRule.compliance_threshold}/100</span>
+              <div className="param-box">
+                <div className="slider-header">
+                  <label className="param-label" htmlFor="scoreSlider">
+                    Điểm Đạt Chuẩn Tối Thiểu (Auto-Pass Threshold)
+                  </label>
+                  <span className="score-pill mono-text" id="scoreValueDisplay">
+                    {selectedRule.compliance_threshold} / 100
+                  </span>
                 </div>
                 <input
                   type="range"
-                  min="70"
-                  max="98"
+                  id="scoreSlider"
+                  className="range-slider"
+                  min="50"
+                  max="100"
                   value={selectedRule.compliance_threshold}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setRuleSets(prev => prev.map(r => r.id === activeRuleId ? { ...r, compliance_threshold: val } : r));
-                  }}
-                  className="w-full mt-2 accent-indigo-600"
+                  onChange={(e) => handleThresholdChange(e.target.value)}
                 />
+                <div className="threshold-legend">
+                  <span className="legend-item legend-danger">&lt; 70: Chặn tự động</span>
+                  <span className="legend-item legend-warning">70–87: Duyệt thủ công</span>
+                  <span className="legend-item legend-success">&ge; 88: Tự động duyệt</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* LIVE COMPLIANCE TESTER PANEL */}
+          <section className="panel tester-panel">
+            <div className="tester-header">
+              <div className="tester-title-group">
+                <svg className="icon-brand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"/>
+                </svg>
+                <h2 className="panel-title-sm">BỘ KIỂM THỬ TUÂN THỦ TỨC THÌ (LIVE COMPLIANCE TESTER)</h2>
+              </div>
+
+              <div className="sample-actions">
+                <span className="sample-label">Mẫu thử nhanh:</span>
+                <button 
+                  type="button" 
+                  className="btn-chip" 
+                  id="loadViolationSample"
+                  onClick={() => {
+                    const sample = 'Serum PureGlow cam kết 100% trị dứt điểm kích ứng da chỉ sau 7 ngày!';
+                    setComplianceText(sample);
+                    runComplianceScan(sample);
+                  }}
+                >
+                  Mẫu vi phạm
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-chip" 
+                  id="loadStandardSample"
+                  onClick={() => {
+                    const sample = 'PureGlow Serum B5 giúp cấp ẩm sâu, làm dịu nhanh và hỗ trợ phục hồi da nhạy cảm chỉ sau 7 ngày.';
+                    setComplianceText(sample);
+                    runComplianceScan(sample);
+                  }}
+                >
+                  Mẫu đạt chuẩn
+                </button>
               </div>
             </div>
 
-          </div>
+            <div className="tester-body">
+              {/* Input Column */}
+              <div className="tester-input-col">
+                <label htmlFor="complianceInput" className="sub-label">Bản thảo nội dung cần kiểm tra</label>
+                <textarea 
+                  id="complianceInput" 
+                  className="tester-textarea" 
+                  rows="4"
+                  value={complianceText}
+                  onChange={(e) => {
+                    setComplianceText(e.target.value);
+                  }}
+                />
 
-          {/* Interactive Live Compliance Tester */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <h3 className="font-bold text-xs text-slate-900 uppercase font-mono">
-                  BỘ KIỂM THỬ TUÂN THỦ TỨC THÌ (LIVE COMPLIANCE TESTER)
-                </h3>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400">Kiểm tra ngay văn bản mẫu</span>
-            </div>
-
-            <textarea
-              rows="3"
-              value={testText}
-              onChange={(e) => setTestText(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500 leading-relaxed font-sans"
-              placeholder="Nhập hoặc dán nội dung quảng cáo để quét từ cấm..."
-            />
-
-            <div className="flex items-center justify-between">
-              <button
-                onClick={handleRunLiveTest}
-                className="px-4 py-2 bg-[#3525CD] hover:bg-indigo-800 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition active:scale-95"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Quét Tuân Thủ Ngay</span>
-              </button>
-
-              {testResult && (
-                <div className="flex items-center gap-3 text-xs font-mono">
-                  <span>Điểm: <strong className={testResult.passed ? 'text-emerald-600' : 'text-red-500'}>{testResult.score}/100</strong></span>
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                    testResult.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {testResult.passed ? '✔ Đạt chuẩn' : '⚠️ Vi phạm'}
+                <div className="tester-toolbar">
+                  <span className="char-counter mono-text">
+                    {charCount} ký tự &bull; {wordCount} từ
                   </span>
-                </div>
-              )}
-            </div>
-
-            {testResult && testResult.violations.length > 0 && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs space-y-1">
-                <div className="font-bold text-red-700 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>Phát hiện {testResult.violations.length} từ cấm:</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {testResult.violations.map(v => (
-                    <span key={v} className="bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded font-mono text-[11px]">
-                      "{v}"
-                    </span>
-                  ))}
+                  <button 
+                    type="button" 
+                    className="btn btn-primary" 
+                    id="runScanBtn"
+                    onClick={() => runComplianceScan()}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      <path d="m9 12 2 2 4-4"/>
+                    </svg>
+                    <span>Quét Tuân Thủ Ngay</span>
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Diagnostic Output Column */}
+              <div className="tester-result-col">
+                <div className="result-header">
+                  <div className="result-status-group">
+                    <span className={`badge ${scanResult.passed ? 'badge-success' : 'badge-danger'}`}>
+                      {scanResult.passed ? 'ĐẠT CHUẨN TUÂN THỦ' : 'VI PHẠM QUY TẮC'}
+                    </span>
+                    <span className="mono-text result-rule-ref">{selectedRule.code}</span>
+                  </div>
+                  <div className="result-score-box">
+                    <span className="score-label">Điểm tuân thủ:</span>
+                    <strong className={`score-number mono-text ${scanResult.passed ? 'score-pass' : 'score-fail'}`}>
+                      {scanResult.score}/100
+                    </strong>
+                    <span className="score-req mono-text">
+                      (Yêu cầu &ge; {selectedRule.compliance_threshold})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Highlighted Violations & Missing Keywords */}
+                <div className="diagnostic-list">
+                  {scanResult.violations.length > 0 ? (
+                    <div className="diag-item diag-danger">
+                      <span className="diag-badge">
+                        Từ cấm phát hiện ({scanResult.violations.length})
+                      </span>
+                      <p className="diag-text">
+                        Phát hiện cụm từ vi phạm:&nbsp;
+                        {scanResult.violations.map((v, i) => (
+                          <span key={i}>
+                            <mark className="hl-danger">{v}</mark>
+                            {i < scanResult.violations.length - 1 ? ', ' : '.'}
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="diag-item diag-success">
+                      <span className="diag-badge">Từ cấm: An toàn</span>
+                      <p className="diag-text">Không phát hiện từ ngữ tuyệt đối hóa hoặc vi phạm luật Dược mỹ phẩm.</p>
+                    </div>
+                  )}
+
+                  <div className={`diag-item ${scanResult.missingMandatory.length > 0 ? 'diag-warning' : 'diag-success'}`}>
+                    <span className="diag-badge">
+                      Từ khóa bắt buộc ({scanResult.matchedMandatory.length}/{selectedRule.mandatory_list.length})
+                    </span>
+                    <p className="diag-text">
+                      {scanResult.matchedMandatory.length > 0 && (
+                        <span>
+                          Đã có: {scanResult.matchedMandatory.map((kw, i) => (
+                            <span key={i} className="kw-ok">
+                              {kw}{i < scanResult.matchedMandatory.length - 1 ? ', ' : ''}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                      {scanResult.missingMandatory.length > 0 && (
+                        <span>
+                          {scanResult.matchedMandatory.length > 0 ? ' • ' : ''}
+                          Còn thiếu: {scanResult.missingMandatory.map((kw, i) => (
+                            <span key={i} className="kw-missing">
+                              {kw}{i < scanResult.missingMandatory.length - 1 ? ', ' : ''}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* AI Safe Rewrite Suggestion */}
+                <div className="ai-rewrite-box">
+                  <div className="rewrite-top">
+                    <span className="rewrite-title">
+                      &#10024; Gợi ý viết lại an toàn (Chuẩn Tone Chuyên gia &amp; Thân thiện):
+                    </span>
+                    <button 
+                      type="button" 
+                      className="btn-copy" 
+                      id="applyRewriteBtn"
+                      onClick={() => {
+                        setComplianceText(scanResult.rewrite);
+                        setTimeout(() => runComplianceScan(scanResult.rewrite), 100);
+                      }}
+                    >
+                      Áp dụng câu này
+                    </button>
+                  </div>
+                  <p className="rewrite-content" id="rewriteText">
+                    "{scanResult.rewrite}"
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
 
         </div>
-
       </div>
+
+      {/* Modal: Thêm bộ quy tắc mới */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base text-slate-900">Thêm Bộ Quy Tắc Mới</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg">&times;</button>
+            </div>
+            <form onSubmit={handleCreateRule} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tên bộ quy tắc</label>
+                <input 
+                  type="text"
+                  required
+                  value={newRuleName}
+                  onChange={(e) => setNewRuleName(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg text-xs focus:outline-none focus:border-indigo-600"
+                  placeholder="Ví dụ: Quy tắc Facebook Ads Hè 2026..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Mô tả quy tắc</label>
+                <textarea 
+                  rows="2"
+                  value={newRuleDesc}
+                  onChange={(e) => setNewRuleDesc(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg text-xs focus:outline-none focus:border-indigo-600"
+                  placeholder="Kiểm soát nội dung và đảm bảo tiêu chuẩn truyền thông..."
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-slate-600">Hủy</button>
+                <button type="submit" className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow">Tạo quy tắc</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
