@@ -682,3 +682,469 @@ def delete_user(conn, user_id: int) -> bool:
         return cursor.rowcount > 0
     finally:
         cursor.close()
+
+
+# ============================================================
+# === OBJECTIVES (SMART Goals) ===
+# ============================================================
+
+def create_objective(conn, campaign_id: int, objective_type: str, metric: str,
+                     target_value: float, unit: str, deadline: str,
+                     baseline_value: float = None) -> int:
+    """Tạo mục tiêu SMART cho chiến dịch."""
+    is_pg = _is_pg(conn)
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            cursor.execute(
+                """INSERT INTO objectives
+                   (campaign_id, objective_type, metric, target_value, unit, deadline, baseline_value)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (campaign_id, objective_type, metric, target_value, unit, deadline, baseline_value)
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row["id"] if isinstance(row, dict) else row[0]
+        else:
+            cursor.execute(
+                """INSERT INTO objectives
+                   (campaign_id, objective_type, metric, target_value, unit, deadline, baseline_value)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (campaign_id, objective_type, metric, target_value, unit, deadline, baseline_value)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    finally:
+        cursor.close()
+
+
+def get_objectives(conn, campaign_id: int) -> List[Dict[str, Any]]:
+    """Lấy danh sách mục tiêu SMART theo chiến dịch."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            f"SELECT * FROM objectives WHERE campaign_id = {param_ph} ORDER BY created_at ASC",
+            (campaign_id,)
+        )
+        return [_row_to_dict(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+
+
+# ============================================================
+# === BUDGET_LINES ===
+# ============================================================
+
+def create_budget_line(conn, campaign_id: int, category: str, channel: str,
+                       planned_amount: float, note: str = '') -> int:
+    """Tạo dòng ngân sách chi tiết cho chiến dịch."""
+    is_pg = _is_pg(conn)
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            cursor.execute(
+                """INSERT INTO budget_lines
+                   (campaign_id, category, channel, planned_amount, note)
+                   VALUES (%s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (campaign_id, category, channel, planned_amount, note)
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row["id"] if isinstance(row, dict) else row[0]
+        else:
+            cursor.execute(
+                """INSERT INTO budget_lines
+                   (campaign_id, category, channel, planned_amount, note)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (campaign_id, category, channel, planned_amount, note)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    finally:
+        cursor.close()
+
+
+def get_budget_lines(conn, campaign_id: int) -> List[Dict[str, Any]]:
+    """Lấy danh sách dòng ngân sách theo chiến dịch."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            f"SELECT * FROM budget_lines WHERE campaign_id = {param_ph} ORDER BY created_at ASC",
+            (campaign_id,)
+        )
+        return [_row_to_dict(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+
+
+# ============================================================
+# === COMPLIANCE_CHECKS ===
+# ============================================================
+
+def create_compliance_check(conn, post_id: int, score: int, risk_level: str,
+                            findings: list, engine_version: str = '1.0') -> int:
+    """Lưu kết quả compliance check cho bài viết."""
+    is_pg = _is_pg(conn)
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            findings_val = Json(findings) if Json else json.dumps(findings, ensure_ascii=False)
+            cursor.execute(
+                """INSERT INTO compliance_checks
+                   (post_id, score, risk_level, findings, engine_version)
+                   VALUES (%s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (post_id, score, risk_level, findings_val, engine_version)
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row["id"] if isinstance(row, dict) else row[0]
+        else:
+            cursor.execute(
+                """INSERT INTO compliance_checks
+                   (post_id, score, risk_level, findings, engine_version)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (post_id, score, risk_level, json.dumps(findings, ensure_ascii=False), engine_version)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    finally:
+        cursor.close()
+
+
+def get_latest_compliance_check(conn, post_id: int) -> Optional[Dict[str, Any]]:
+    """Lấy kết quả compliance check mới nhất của bài viết."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            f"SELECT * FROM compliance_checks WHERE post_id = {param_ph} ORDER BY created_at DESC LIMIT 1",
+            (post_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            d = _row_to_dict(row)
+            d["findings"] = _parse_violations(d.get("findings"))
+            return d
+        return None
+    finally:
+        cursor.close()
+
+
+# ============================================================
+# === AI_JOBS ===
+# ============================================================
+
+def create_ai_job(conn, agent: str, campaign_id: int, input_data: dict,
+                  post_id: int = None, requested_by: str = None) -> int:
+    """Tạo AI job mới với trạng thái queued."""
+    is_pg = _is_pg(conn)
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            input_val = Json(input_data) if Json else json.dumps(input_data, ensure_ascii=False)
+            cursor.execute(
+                """INSERT INTO ai_jobs
+                   (agent, campaign_id, post_id, input, requested_by)
+                   VALUES (%s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (agent, campaign_id, post_id, input_val, requested_by)
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row["id"] if isinstance(row, dict) else row[0]
+        else:
+            cursor.execute(
+                """INSERT INTO ai_jobs
+                   (agent, campaign_id, post_id, input, requested_by)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (agent, campaign_id, post_id, json.dumps(input_data, ensure_ascii=False), requested_by)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    finally:
+        cursor.close()
+
+
+def update_ai_job(conn, job_id: int, status: str, output: dict = None,
+                  error: str = None, tokens_in: int = 0, tokens_out: int = 0,
+                  cost: float = 0) -> bool:
+    """Cập nhật trạng thái và kết quả AI job."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            output_val = (Json(output) if Json else json.dumps(output, ensure_ascii=False)) if output is not None else None
+            finished_expr = "now()" if status in ("succeeded", "failed", "cancelled") else "NULL"
+            started_expr = "now()" if status == "running" else "started_at"
+            cursor.execute(
+                f"""UPDATE ai_jobs SET
+                    status = {param_ph}, output = {param_ph}, error = {param_ph},
+                    input_tokens = {param_ph}, output_tokens = {param_ph}, cost_usd = {param_ph},
+                    started_at = CASE WHEN status = 'queued' AND {param_ph} = 'running' THEN now() ELSE started_at END,
+                    finished_at = CASE WHEN {param_ph} IN ('succeeded','failed','cancelled') THEN now() ELSE finished_at END
+                    WHERE id = {param_ph}""",
+                (status, output_val, error, tokens_in, tokens_out, cost, status, status, job_id)
+            )
+        else:
+            output_str = json.dumps(output, ensure_ascii=False) if output is not None else None
+            cursor.execute(
+                f"""UPDATE ai_jobs SET
+                    status = {param_ph}, output = {param_ph}, error = {param_ph},
+                    input_tokens = {param_ph}, output_tokens = {param_ph}, cost_usd = {param_ph}
+                    WHERE id = {param_ph}""",
+                (status, output_str, error, tokens_in, tokens_out, cost, job_id)
+            )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        cursor.close()
+
+
+def get_ai_job(conn, job_id: int) -> Optional[Dict[str, Any]]:
+    """Lấy thông tin AI job theo ID."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT * FROM ai_jobs WHERE id = {param_ph}", (job_id,))
+        row = cursor.fetchone()
+        if row:
+            d = _row_to_dict(row)
+            if isinstance(d.get("input"), str):
+                try:
+                    d["input"] = json.loads(d["input"])
+                except Exception:
+                    pass
+            if isinstance(d.get("output"), str):
+                try:
+                    d["output"] = json.loads(d["output"])
+                except Exception:
+                    pass
+            return d
+        return None
+    finally:
+        cursor.close()
+
+
+def get_all_ai_jobs(conn) -> List[Dict[str, Any]]:
+    """Lấy danh sách tất cả AI jobs."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM ai_jobs ORDER BY queued_at DESC LIMIT 100")
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            d = _row_to_dict(r)
+            if isinstance(d.get("input"), str):
+                try:
+                    d["input"] = json.loads(d["input"])
+                except Exception:
+                    pass
+            if isinstance(d.get("output"), str):
+                try:
+                    d["output"] = json.loads(d["output"])
+                except Exception:
+                    pass
+            result.append(d)
+        return result
+    finally:
+        cursor.close()
+
+
+# ============================================================
+# === PARTNERS ===
+# ============================================================
+
+def create_partner(conn, partner_type: str, name: str, platform: str = None,
+                   follower_count: int = 0, contact_email: str = None,
+                   fee_per_post: float = None) -> int:
+    """Tạo đối tác mới (KOL/KOC/agency)."""
+    is_pg = _is_pg(conn)
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            cursor.execute(
+                """INSERT INTO partners
+                   (partner_type, name, platform, follower_count, contact_email, fee_per_post)
+                   VALUES (%s, %s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (partner_type, name, platform, follower_count, contact_email, fee_per_post)
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row["id"] if isinstance(row, dict) else row[0]
+        else:
+            cursor.execute(
+                """INSERT INTO partners
+                   (partner_type, name, platform, follower_count, contact_email, fee_per_post)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (partner_type, name, platform, follower_count, contact_email, fee_per_post)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    finally:
+        cursor.close()
+
+
+def get_all_partners(conn) -> List[Dict[str, Any]]:
+    """Lấy danh sách tất cả đối tác."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM partners ORDER BY created_at DESC")
+        return [_row_to_dict(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+
+
+# ============================================================
+# === PERFORMANCE_METRICS ===
+# ============================================================
+
+def upsert_performance_metrics(conn, campaign_id: int, channel: str,
+                                metric_date: str, traffic_type: str = 'organic',
+                                post_id: int = None, **metrics) -> bool:
+    """Cập nhật hoặc tạo mới số liệu hiệu suất (upsert theo campaign+channel+date+traffic)."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    views = metrics.get("views", 0)
+    reach = metrics.get("reach", 0)
+    engagements = metrics.get("engagements", 0)
+    clicks = metrics.get("clicks", 0)
+    orders = metrics.get("orders", 0)
+    gmv = metrics.get("gmv", 0)
+    spend = metrics.get("spend", 0)
+
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            cursor.execute(
+                """INSERT INTO performance_metrics
+                   (campaign_id, post_id, channel, metric_date, traffic_type,
+                    views, reach, engagements, clicks, orders, gmv, spend)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT DO NOTHING""",
+                (campaign_id, post_id, channel, metric_date, traffic_type,
+                 views, reach, engagements, clicks, orders, gmv, spend)
+            )
+        else:
+            cursor.execute(
+                """INSERT OR IGNORE INTO performance_metrics
+                   (campaign_id, post_id, channel, metric_date, traffic_type,
+                    views, reach, engagements, clicks, orders, gmv, spend)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (campaign_id, post_id, channel, metric_date, traffic_type,
+                 views, reach, engagements, clicks, orders, gmv, spend)
+            )
+        conn.commit()
+        return True
+    finally:
+        cursor.close()
+
+
+def get_campaign_performance(conn, campaign_id: int) -> List[Dict[str, Any]]:
+    """Lấy danh sách số liệu hiệu suất của chiến dịch."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            f"""SELECT * FROM performance_metrics
+               WHERE campaign_id = {param_ph}
+               ORDER BY metric_date DESC, channel ASC""",
+            (campaign_id,)
+        )
+        return [_row_to_dict(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+
+
+# ============================================================
+# === PRODUCTS & CLAIMS (Mục 5.3 & Nguyên tắc P3) ===
+# ============================================================
+
+def get_all_products(conn) -> List[Dict[str, Any]]:
+    """Lấy danh sách tất cả sản phẩm."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM products ORDER BY id ASC")
+        return [_row_to_dict(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+
+
+def get_product_by_id(conn, product_id: int) -> Optional[Dict[str, Any]]:
+    """Lấy chi tiết sản phẩm theo ID."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT * FROM products WHERE id = {param_ph}", (product_id,))
+        r = cursor.fetchone()
+        return _row_to_dict(r) if r else None
+    finally:
+        cursor.close()
+
+
+def get_claims_by_product(conn, product_id: int) -> List[Dict[str, Any]]:
+    """Lấy danh sách claim của một sản phẩm."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT * FROM product_claims WHERE product_id = {param_ph} ORDER BY id ASC", (product_id,))
+        return [_row_to_dict(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+
+
+def create_product_claim(conn, product_id: int, claim_text: str, claim_type: str = 'benefit', valid_until: str = None) -> int:
+    """Tạo claim mới cho sản phẩm ở trạng thái draft."""
+    is_pg = _is_pg(conn)
+    cursor = conn.cursor()
+    try:
+        if is_pg:
+            cursor.execute(
+                """INSERT INTO product_claims (product_id, claim_text, claim_type, status, valid_until, created_at)
+                   VALUES (%s, %s, %s, 'draft', %s, NOW()) RETURNING id""",
+                (product_id, claim_text, claim_type, valid_until)
+            )
+            r = cursor.fetchone()
+            conn.commit()
+            return r["id"] if isinstance(r, dict) else r[0]
+        else:
+            now = datetime.now().isoformat()
+            cursor.execute(
+                """INSERT INTO product_claims (product_id, claim_text, claim_type, status, valid_until, created_at)
+                   VALUES (?, ?, ?, 'draft', ?, ?)""",
+                (product_id, claim_text, claim_type, valid_until, now)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    finally:
+        cursor.close()
+
+
+def approve_claim(conn, claim_id: int, approved_by: str = "Legal Reviewer") -> bool:
+    """Duyệt claim sản phẩm (chuyển sang approved)."""
+    is_pg = _is_pg(conn)
+    param_ph = "%s" if is_pg else "?"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            f"UPDATE product_claims SET status = 'approved', approved_by = {param_ph}, approved_at = NOW() WHERE id = {param_ph}",
+            (approved_by, claim_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        cursor.close()
+

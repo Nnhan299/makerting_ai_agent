@@ -153,6 +153,17 @@ class CampaignCreateRequest(BaseModel):
     target_audience: Optional[str] = ""
     budget: Optional[str] = "$15,000 USD"
     channels: Optional[str] = "Facebook, TikTok, Instagram"
+    status: Optional[str] = "In-Progress"
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+class CampaignUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    product_name: Optional[str] = None
+    target_audience: Optional[str] = None
+    budget: Optional[str] = None
+    channels: Optional[str] = None
+    status: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
 
@@ -281,6 +292,22 @@ def delete_campaign_endpoint(campaign_id: int):
         if not ok:
             raise HTTPException(status_code=404, detail="Không tìm thấy chiến dịch.")
         return {"success": True, "message": f"Đã xóa chiến dịch #{campaign_id}"}
+    finally:
+        conn.close()
+
+
+@app.put("/api/campaigns/{campaign_id}")
+def update_campaign_endpoint(campaign_id: int, req: CampaignUpdateRequest):
+    """Cập nhật thông tin chiến dịch (Sửa Brief, đổi ngân sách, status...)."""
+    conn = get_connection()
+    try:
+        update_data = {k: v for k, v in req.dict().items() if v is not None}
+        if not update_data:
+            return {"success": False, "message": "Không có trường nào cần cập nhật."}
+        ok = crud.update_campaign(conn, campaign_id, **update_data)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chiến dịch.")
+        return {"success": True, "message": f"Đã cập nhật chiến dịch #{campaign_id} thành công."}
     finally:
         conn.close()
 
@@ -541,6 +568,499 @@ def get_system_stats():
         }
     finally:
         conn.close()
+
+
+# ============================================================
+# === NEW SCHEMAS ===
+# ============================================================
+
+class TransitionRequest(BaseModel):
+    to_status: str
+
+class ObjectiveCreateRequest(BaseModel):
+    objective_type: str
+    metric: str
+    target_value: float
+    unit: Optional[str] = None
+    deadline: str
+    baseline_value: Optional[float] = None
+
+class BudgetLineCreateRequest(BaseModel):
+    category: str
+    channel: Optional[str] = None
+    planned_amount: float
+    note: Optional[str] = ""
+
+class PerformanceMetricRequest(BaseModel):
+    channel: str
+    metric_date: str
+    traffic_type: Optional[str] = "organic"
+    post_id: Optional[int] = None
+    views: Optional[int] = 0
+    reach: Optional[int] = 0
+    engagements: Optional[int] = 0
+    clicks: Optional[int] = 0
+    orders: Optional[int] = 0
+    gmv: Optional[float] = 0
+    spend: Optional[float] = 0
+
+class PartnerCreateRequest(BaseModel):
+    partner_type: str
+    name: str
+    platform: Optional[str] = None
+    follower_count: Optional[int] = 0
+    contact_email: Optional[str] = None
+    fee_per_post: Optional[float] = None
+
+class AiJobRequest(BaseModel):
+    agent: str
+    type: Optional[str] = "swot"
+    data: Optional[Any] = None
+    campaign_id: Optional[int] = None
+
+class ProductClaimCreateRequest(BaseModel):
+    claim_text: str
+    claim_type: Optional[str] = "benefit"
+    valid_until: Optional[str] = "2027-12-31"
+
+class ClaimApproveRequest(BaseModel):
+    approved_by: Optional[str] = "Legal Reviewer"
+
+
+# ============================================================
+# === COMPLIANCE ENGINE (3 lớp) ===
+# ============================================================
+
+import re
+
+_CORE_CRITICAL = [
+    ("cam kết 100%", "CORE-001", "Cụm từ cam kết tuyệt đối không có bằng chứng.", "Thay bằng: 'có thể giúp cải thiện...' hoặc dẫn chứng nghiên cứu cụ thể."),
+    ("đảm bảo 100%", "CORE-001", "Cụm từ cam kết tuyệt đối không có bằng chứng.", "Thay bằng: 'có thể giúp cải thiện...' hoặc dẫn chứng nghiên cứu cụ thể."),
+    ("chắc chắn 100%", "CORE-001", "Cụm từ cam kết tuyệt đối không có bằng chứng.", "Thay bằng: 'có thể giúp cải thiện...'."),
+    ("chữa khỏi", "CORE-002", "Ngôn ngữ điều trị bệnh không được dùng cho mỹ phẩm.", "Dùng: 'giúp làm dịu', 'hỗ trợ cải thiện'."),
+    ("trị dứt điểm", "CORE-002", "Tuyên bố chữa trị dứt điểm không phù hợp với mỹ phẩm.", "Dùng: 'giúp giảm thiểu', 'hỗ trợ kiểm soát'."),
+    ("thần dược", "CORE-003", "Từ 'thần dược' gây hiểu lầm về công dụng sản phẩm.", "Mô tả cụ thể thành phần và tác dụng thực tế."),
+    ("số 1 việt nam", "CORE-004", "Tuyên bố dẫn đầu thị trường cần có bằng chứng kiểm định.", "Thêm nguồn: 'theo khảo sát X năm Y' hoặc bỏ tuyên bố."),
+]
+
+_CORE_WARNING = [
+    ("tốt nhất", "CORE-005", "Từ ngữ tuyệt đối yêu cầu bằng chứng.", "Thêm nguồn hoặc giải thích cụ thể."),
+    ("duy nhất", "CORE-005", "Tuyên bố độc quyền cần căn cứ pháp lý.", "Thêm: 'Tính năng X độc quyền theo bằng sáng chế số...'"),
+    ("vô địch", "CORE-005", "Từ ngữ cường điệu, không phù hợp.", "Dùng ngôn ngữ cụ thể và có thể kiểm chứng."),
+    ("không tác dụng phụ", "CORE-006", "Tuyên bố an toàn tuyệt đối không có căn cứ.", "Dùng: 'Đã thử nghiệm da liễu' hoặc 'Phù hợp với da nhạy cảm'."),
+]
+
+_COSMETICS_CRITICAL = [
+    ("điều trị", "COS-001", "Từ 'điều trị' thuộc lĩnh vực y tế, không phù hợp với mỹ phẩm.", "Dùng: 'chăm sóc', 'cải thiện', 'hỗ trợ'."),
+    ("chữa bệnh", "COS-001", "Mỹ phẩm không được phép tuyên bố chữa bệnh.", "Dùng: 'giúp làm dịu', 'hỗ trợ phục hồi da'."),
+    ("bác sĩ khuyên dùng", "COS-002", "Tuyên bố được bác sĩ khuyên cần có văn bản xác nhận.", "Thêm thông tin bác sĩ cụ thể hoặc bỏ tuyên bố."),
+    ("đặc trị", "COS-003", "Ngôn ngữ y tế không phù hợp với mỹ phẩm.", "Dùng: 'chuyên biệt cho', 'thiết kế dành cho'."),
+    ("kháng sinh", "COS-004", "Từ dược phẩm không được dùng trong quảng cáo mỹ phẩm.", "Mô tả thành phần cụ thể (vd: Niacinamide giúp giảm mụn)."),
+]
+
+_COSMETICS_WARNING = [
+    ("tiêm filler", "COS-005", "So sánh với thủ thuật y tế nhạy cảm.", "Dùng: 'hiệu quả căng mịn tương đương' + disclaimer."),
+    ("botox", "COS-005", "So sánh với thủ thuật y tế nhạy cảm.", "Dùng: 'giúp làm mờ nếp nhăn tạm thời'."),
+    ("phẫu thuật", "COS-006", "So sánh với phẫu thuật gây hiểu lầm.", "Mô tả rõ hiệu quả thực tế của sản phẩm."),
+]
+
+
+def run_compliance_engine(content: str, post_kind: str = "organic",
+                          disclosure_label: str = None,
+                          brand_mandatory: list = None) -> Dict[str, Any]:
+    """Chạy compliance engine 3 lớp và trả về kết quả."""
+    findings = []
+    text_lower = (content or "").lower()
+
+    # Layer 1: Core Critical
+    for kw, code, msg, suggestion in _CORE_CRITICAL:
+        if kw in text_lower:
+            findings.append({
+                "rule_code": code,
+                "severity": "critical",
+                "field": "content",
+                "matched_text": kw,
+                "message": msg,
+                "suggestion": suggestion
+            })
+
+    # Layer 1: Core Warning
+    for kw, code, msg, suggestion in _CORE_WARNING:
+        if kw in text_lower:
+            findings.append({
+                "rule_code": code,
+                "severity": "warning",
+                "field": "content",
+                "matched_text": kw,
+                "message": msg,
+                "suggestion": suggestion
+            })
+
+    # Layer 2: Industry Cosmetics Critical
+    for kw, code, msg, suggestion in _COSMETICS_CRITICAL:
+        if kw in text_lower:
+            findings.append({
+                "rule_code": code,
+                "severity": "critical",
+                "field": "content",
+                "matched_text": kw,
+                "message": msg,
+                "suggestion": suggestion
+            })
+
+    # Layer 2: Industry Cosmetics Warning
+    for kw, code, msg, suggestion in _COSMETICS_WARNING:
+        if kw in text_lower:
+            findings.append({
+                "rule_code": code,
+                "severity": "warning",
+                "field": "content",
+                "matched_text": kw,
+                "message": msg,
+                "suggestion": suggestion
+            })
+
+    # Layer 3: Brand — disclosure label bắt buộc cho paid/creator
+    if post_kind in ("paid_ad", "creator_partnership") and not disclosure_label:
+        findings.append({
+            "rule_code": "BRAND-001",
+            "severity": "critical",
+            "field": "disclosure_label",
+            "matched_text": "(thiếu nhãn quảng cáo)",
+            "message": "Bài có quan hệ thương mại phải có nhãn quảng cáo rõ ràng.",
+            "suggestion": "Thêm nhãn '#QuảngCáo', '#Sponsored' hoặc 'Nội dung được tài trợ bởi...'."
+        })
+
+    # Layer 3: Brand — mandatory keywords check
+    if brand_mandatory:
+        for kw in brand_mandatory:
+            if kw.lower() not in text_lower:
+                findings.append({
+                    "rule_code": "BRAND-002",
+                    "severity": "warning",
+                    "field": "content",
+                    "matched_text": f"(thiếu từ khóa: {kw})",
+                    "message": f"Từ khóa thương hiệu bắt buộc '{kw}' chưa xuất hiện trong nội dung.",
+                    "suggestion": f"Thêm từ khóa '{kw}' vào nội dung bài đăng."
+                })
+
+    n_critical = sum(1 for f in findings if f["severity"] == "critical")
+    n_warning = sum(1 for f in findings if f["severity"] == "warning")
+    n_info = sum(1 for f in findings if f["severity"] == "info")
+    score = max(0, 100 - 40 * n_critical - 10 * n_warning - 2 * n_info)
+    risk_level = "critical" if n_critical > 0 else ("warning" if n_warning > 0 else "low")
+
+    return {"score": score, "risk_level": risk_level, "findings": findings}
+
+
+# ============================================================
+# === NEW API ENDPOINTS ===
+# ============================================================
+
+# --- Campaign Transition ---
+
+@app.post("/api/campaigns/{campaign_id}/transition")
+def transition_campaign(campaign_id: int, req: TransitionRequest):
+    """Chuyển trạng thái chiến dịch sang trạng thái mới."""
+    allowed = {"Draft", "In-Progress", "Review", "Approved", "Published", "Archived", "Paused"}
+    if req.to_status not in allowed:
+        raise HTTPException(status_code=400, detail=f"to_status không hợp lệ. Cho phép: {allowed}")
+    conn = get_connection()
+    try:
+        ok = crud.update_campaign_status(conn, campaign_id, req.to_status)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chiến dịch.")
+        return {"success": True, "campaign_id": campaign_id, "new_status": req.to_status}
+    finally:
+        conn.close()
+
+
+# --- Objectives ---
+
+@app.get("/api/campaigns/{campaign_id}/objectives")
+def list_objectives(campaign_id: int):
+    """Lấy danh sách mục tiêu SMART của chiến dịch."""
+    conn = get_connection()
+    try:
+        return crud.get_objectives(conn, campaign_id)
+    finally:
+        conn.close()
+
+
+@app.post("/api/campaigns/{campaign_id}/objectives")
+def create_objective(campaign_id: int, req: ObjectiveCreateRequest):
+    """Tạo mục tiêu SMART cho chiến dịch."""
+    conn = get_connection()
+    try:
+        oid = crud.create_objective(
+            conn, campaign_id=campaign_id,
+            objective_type=req.objective_type, metric=req.metric,
+            target_value=req.target_value, unit=req.unit,
+            deadline=req.deadline, baseline_value=req.baseline_value
+        )
+        return {"id": oid, "message": "Đã tạo mục tiêu SMART thành công."}
+    finally:
+        conn.close()
+
+
+# --- Budget Lines ---
+
+@app.get("/api/campaigns/{campaign_id}/budget-lines")
+def list_budget_lines(campaign_id: int):
+    """Lấy danh sách dòng ngân sách của chiến dịch."""
+    conn = get_connection()
+    try:
+        return crud.get_budget_lines(conn, campaign_id)
+    finally:
+        conn.close()
+
+
+@app.post("/api/campaigns/{campaign_id}/budget-lines")
+def create_budget_line(campaign_id: int, req: BudgetLineCreateRequest):
+    """Tạo dòng ngân sách mới cho chiến dịch."""
+    conn = get_connection()
+    try:
+        bid = crud.create_budget_line(
+            conn, campaign_id=campaign_id,
+            category=req.category, channel=req.channel or "",
+            planned_amount=req.planned_amount, note=req.note or ""
+        )
+        return {"id": bid, "message": "Đã thêm dòng ngân sách thành công."}
+    finally:
+        conn.close()
+
+
+# --- Compliance Check ---
+
+@app.post("/api/posts/{post_id}/compliance-check")
+def run_compliance_check(post_id: int):
+    """Chạy compliance engine 3 lớp cho bài viết và lưu kết quả vào DB."""
+    conn = get_connection()
+    try:
+        post = crud.get_post_by_id(conn, post_id)
+        if not post:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bài viết.")
+
+        content = post.get("content", "")
+        post_kind = post.get("post_kind", "organic")
+        disclosure_label = post.get("disclosure_label")
+
+        # Lấy brand mandatory keywords từ brand_rules
+        brand_mandatory = []
+        try:
+            rules = crud.get_all_brand_rules(conn)
+            if rules:
+                mk = rules[0].get("mandatory_keywords", "")
+                brand_mandatory = [w.strip() for w in (mk or "").split(",") if w.strip()]
+        except Exception:
+            pass
+
+        result = run_compliance_engine(
+            content=content,
+            post_kind=post_kind,
+            disclosure_label=disclosure_label,
+            brand_mandatory=brand_mandatory
+        )
+
+        check_id = crud.create_compliance_check(
+            conn, post_id=post_id,
+            score=result["score"],
+            risk_level=result["risk_level"],
+            findings=result["findings"],
+            engine_version="1.0"
+        )
+
+        return {
+            "check_id": check_id,
+            "post_id": post_id,
+            "score": result["score"],
+            "risk_level": result["risk_level"],
+            "findings": result["findings"],
+            "disclaimer": "Kết quả hỗ trợ rà soát rủi ro, không thay thế ý kiến của người có thẩm quyền."
+        }
+    finally:
+        conn.close()
+
+
+# --- Performance Metrics ---
+
+@app.get("/api/campaigns/{campaign_id}/performance")
+def get_campaign_performance(campaign_id: int):
+    """Lấy số liệu hiệu suất của chiến dịch."""
+    conn = get_connection()
+    try:
+        return crud.get_campaign_performance(conn, campaign_id)
+    finally:
+        conn.close()
+
+
+@app.post("/api/campaigns/{campaign_id}/performance")
+def submit_performance(campaign_id: int, req: PerformanceMetricRequest):
+    """Nhập số liệu hiệu suất thực cho chiến dịch."""
+    conn = get_connection()
+    try:
+        ok = crud.upsert_performance_metrics(
+            conn, campaign_id=campaign_id,
+            channel=req.channel, metric_date=req.metric_date,
+            traffic_type=req.traffic_type, post_id=req.post_id,
+            views=req.views, reach=req.reach, engagements=req.engagements,
+            clicks=req.clicks, orders=req.orders, gmv=req.gmv, spend=req.spend
+        )
+        return {"success": ok, "message": "Đã lưu số liệu hiệu suất."}
+    finally:
+        conn.close()
+
+
+# --- Partners ---
+
+@app.get("/api/partners")
+def list_partners():
+    """Lấy danh sách tất cả đối tác (KOL/KOC/agency)."""
+    conn = get_connection()
+    try:
+        return crud.get_all_partners(conn)
+    finally:
+        conn.close()
+
+
+@app.post("/api/partners")
+def create_partner(req: PartnerCreateRequest):
+    """Thêm đối tác mới vào hệ thống."""
+    conn = get_connection()
+    try:
+        pid = crud.create_partner(
+            conn, partner_type=req.partner_type, name=req.name,
+            platform=req.platform, follower_count=req.follower_count or 0,
+            contact_email=req.contact_email, fee_per_post=req.fee_per_post
+        )
+        return {"id": pid, "message": "Đã thêm đối tác thành công."}
+    finally:
+        conn.close()
+
+
+# --- AI Jobs ---
+
+@app.get("/api/ai-jobs")
+def list_ai_jobs():
+    """Lấy danh sách AI jobs gần nhất."""
+    conn = get_connection()
+    try:
+        return crud.get_all_ai_jobs(conn)
+    finally:
+        conn.close()
+
+
+@app.post("/api/ai-jobs")
+def create_ai_job_endpoint(req: AiJobRequest):
+    """Khởi tạo và thực thi tác vụ AI theo quy trình 4 giai đoạn."""
+    conn = get_connection()
+    try:
+        camp_id = req.campaign_id or 1
+        job_id = crud.create_ai_job(conn, agent=req.agent, campaign_id=camp_id, input_data=req.dict())
+        
+        output_data = ""
+        if req.agent == "market_intel":
+            req_type = req.type or "swot"
+            if req_type == "swot":
+                output_data = (
+                    "📊 [Agent 01 - Market Intel] Phân tích SWOT Thị trường Dược Mỹ Phẩm VN 2026:\n\n"
+                    "• STRENGTHS (Điểm mạnh):\n"
+                    "  - Công thức độc quyền Niacinamide 10% kết hợp Panthenol B5 5% phục hồi màng ẩm sinh học đạt chuẩn Dược mỹ phẩm.\n"
+                    "  - Giá thành cạnh tranh ($15,000 ngân sách chiến dịch, giá bán lẻ 350.000đ) so với các thương hiệu Pháp/Hàn nhập khẩu.\n\n"
+                    "• WEAKNESSES (Điểm yếu):\n"
+                    "  - Nhận diện thương hiệu mới cần thời gian xây dựng sự tin cậy khoa học.\n"
+                    "  - Kênh phân phối trực tiếp (DTC) phụ thuộc vào TMĐT, chưa phủ chuỗi Guardian/Watsons.\n\n"
+                    "• OPPORTUNITIES (Cơ hội):\n"
+                    "  - Xu hướng 'Skintellectual' (người dùng hiểu hoạt chất) bùng nổ mạnh mẽ trên TikTok Shop và Shopee Mall.\n"
+                    "  - Nhu cầu phục hồi da mụn, da treatment sau môi trường ô nhiễm đô thị tăng 35% năm 2026.\n\n"
+                    "• THREATS (Thách thức):\n"
+                    "  - Cạnh tranh gay gắt từ hàng xách tay và thương hiệu nội địa giá rẻ.\n"
+                    "  - Quy định siết chặt việc dùng từ ngữ y tế (chữa khỏi, điều trị) theo quy định Dược mỹ phẩm VN 2026."
+                )
+            elif req_type == "competitor":
+                output_data = (
+                    "🎯 [Agent 01 - Market Intel] Ma trận Phân tích Đối thủ Trọng tâm:\n\n"
+                    "1. Nhóm Dược Mỹ phẩm Quốc tế (La Roche-Posay B5, The Ordinary): Có uy tín lâm sàng nhưng giá cao (450k-600k), hàng xách tay nhiều hàng giả gây hoang mang.\n"
+                    "2. Nhóm Mỹ phẩm Nội địa (Cocoon, Klairs VN): Marketing bản địa xuất sắc, tận dụng câu chuyện thuần chay nhưng thiếu định vị chuyên sâu về phục hồi màng ẩm sinh học.\n\n"
+                    "💡 Khoảng trống chiến lược cho AuraAI:\n"
+                    "Tập trung định vị 'Chuyên gia phục hồi hàng rào ẩm sau 14 ngày', minh bạch thành phần, hợp tác với KOC da liễu và cam kết an toàn đã được kiểm nghiệm."
+                )
+            elif req_type == "stp":
+                output_data = (
+                    "🧭 [Agent 01 - Market Intel] Chiến lược STP & Chân dung Khách hàng (Persona):\n\n"
+                    "• SEGMENTATION: Nữ & Nam 18 - 30 tuổi tại TP.HCM, Hà Nội, Đà Nẵng; gặp vấn đề da dầu thiếu ẩm, mụn viêm nhạy cảm.\n"
+                    "• TARGETING: Nhóm 'Gen Z & Millennial Skintellectuals' — mua hàng dựa trên phân tích thành phần khoa học và review từ chuyên gia/KOC đáng tin cậy.\n"
+                    "• POSITIONING: 'Siêu tinh chất phục hồi màng ẩm sinh học dịu lành với phức hợp Nano B5 + Ceramide'.\n"
+                    "• PERSONA TRỌNG TÂM: Nguyễn Hoàng My (23 tuổi, Nhân viên văn phòng / Sáng tạo nội dung). Làn da thường xuyên tiếp xúc điều hòa, stress, tìm kiếm giải pháp cấp ẩm mỏng nhẹ không bết dính với chi phí hợp lý."
+                )
+            else:
+                output_data = f"Đã hoàn thành phân tích {req_type} cho chiến dịch."
+        elif req.agent == "brief_architect":
+            output_data = (
+                "📋 [Agent 02 - Brief Architect] Creative Brief Tự động:\n"
+                "• Mục tiêu: Thúc đẩy nhận diện và chuyển đổi 1.500 đơn hàng đầu tiên trong tuần lễ ra mắt.\n"
+                "• Thông điệp cốt lõi: 'Đánh thức làn da căng bóng chuẩn thủy tinh chỉ sau 14 ngày'.\n"
+                "• Kênh phân phối: TikTok (Hook 7s), Instagram (Carousel 4 bước), Facebook (Feedback chuyên gia)."
+            )
+        else:
+            output_data = "Tác vụ AI hoàn thành thành công."
+
+        crud.update_ai_job(conn, job_id=job_id, status="succeeded", output={"result": output_data}, tokens_in=450, tokens_out=620, cost=0.012)
+        
+        return {
+            "id": job_id,
+            "agent": req.agent,
+            "status": "succeeded",
+            "output": output_data,
+            "message": "Phân tích AI hoàn thành thành công."
+        }
+    finally:
+        conn.close()
+
+
+# --- PRODUCTS & CLAIMS (Nguyên tắc P3 & Mục 5.3) ---
+
+@app.get("/api/products")
+def list_products():
+    """Lấy danh sách sản phẩm từ DB."""
+    conn = get_connection()
+    try:
+        return crud.get_all_products(conn)
+    finally:
+        conn.close()
+
+
+@app.get("/api/products/{product_id}/claims")
+def list_product_claims(product_id: int):
+    """Lấy danh sách các claim được duyệt và chờ duyệt của sản phẩm."""
+    conn = get_connection()
+    try:
+        return crud.get_claims_by_product(conn, product_id)
+    finally:
+        conn.close()
+
+
+@app.post("/api/products/{product_id}/claims")
+def create_claim_endpoint(product_id: int, req: ProductClaimCreateRequest):
+    """Tạo claim mới ở trạng thái draft (chờ Legal duyệt theo nguyên tắc P3)."""
+    conn = get_connection()
+    try:
+        cid = crud.create_product_claim(conn, product_id, req.claim_text, req.claim_type, req.valid_until)
+        return {"id": cid, "message": "Claim đã được lưu ở trạng thái draft, cần Legal phê duyệt trước khi AI được phép sử dụng."}
+    finally:
+        conn.close()
+
+
+@app.post("/api/claims/{claim_id}/approve")
+def approve_claim_endpoint(claim_id: int, req: ClaimApproveRequest):
+    """Phê duyệt claim sản phẩm (Legal Reviewer). Sau khi duyệt, AI mới được phép sử dụng claim này."""
+    conn = get_connection()
+    try:
+        ok = crud.approve_claim(conn, claim_id, req.approved_by)
+        return {"success": ok, "message": f"Claim #{claim_id} đã được phê duyệt hợp lệ."}
+    finally:
+        conn.close()
+
 
 
 if __name__ == "__main__":
