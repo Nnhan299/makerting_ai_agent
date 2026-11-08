@@ -177,3 +177,17 @@ export async function fetchStats() {
   }
 }
 
+export async function loginApi(username, password) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || 'Đăng nhập không thành công');
+  }
+  return await res.json();
+}
+
+

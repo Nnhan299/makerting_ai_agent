@@ -8,9 +8,12 @@ import {
   ShieldCheck,
   Settings,
   Database,
-  Check
+  Check,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 
+import Login from './pages/Login';
 import StudioCanvas from './pages/StudioCanvas';
 import Campaigns from './pages/Campaigns';
 import BrandRules from './pages/BrandRules';
@@ -49,6 +52,33 @@ export default function App() {
     } catch (e) {}
     return defaultUsers[0];
   });
+
+  // Authentication Session State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aura_active_user');
+      return !!saved;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    try {
+      localStorage.setItem('aura_active_user', JSON.stringify(user));
+    } catch (e) {}
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('aura_active_user');
+      localStorage.removeItem('aura_token');
+    } catch (e) {}
+    setIsAuthenticated(false);
+    setUserDropdownOpen(false);
+  };
 
   const handleSwitchUser = (userToSwitch) => {
     setCurrentUser(userToSwitch);
@@ -267,6 +297,11 @@ export default function App() {
     }
   };
 
+  // If not authenticated, render the Enterprise Login Screen
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-slate-800 font-sans flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
       
@@ -464,14 +499,14 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Footer links */}
-                <div className="border-t border-slate-100 mt-2 pt-2 space-y-1">
+                {/* Footer links & Actions */}
+                <div className="border-t border-slate-100 mt-2 pt-2 space-y-1.5">
                   <button 
                     onClick={() => {
                       setUserDropdownOpen(false);
                       setActiveNav('Admin & System');
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center justify-between text-slate-700"
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center justify-between text-slate-700 cursor-pointer"
                   >
                     <span className="flex items-center gap-2">
                       <Settings className="w-3.5 h-3.5 text-slate-400" />
@@ -480,7 +515,29 @@ export default function App() {
                     <span className="text-[10px] font-mono text-slate-400">&rarr;</span>
                   </button>
 
-                  <div className="px-2 py-1 text-[11px] text-slate-500 font-mono flex items-center justify-between border-t border-slate-50 pt-1.5">
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-indigo-50 text-indigo-700 font-semibold flex items-center justify-between transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <LogIn className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Đăng nhập tài khoản khác...</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-indigo-400">&rarr;</span>
+                  </button>
+
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-2.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold flex items-center justify-between border border-red-200 transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <LogOut className="w-3.5 h-3.5 text-red-600" />
+                      <span>Đăng xuất (Sign out)</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-red-500 font-bold">&rarr;</span>
+                  </button>
+
+                  <div className="px-2 py-1 text-[11px] text-slate-500 font-mono flex items-center justify-between border-t border-slate-100 pt-1.5">
                     <span>Database:</span>
                     <strong className="text-emerald-700 font-bold">{dbInfo?.engine || 'PostgreSQL 16'}</strong>
                   </div>
@@ -488,6 +545,15 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Quick 1-Click Logout Button next to Avatar */}
+          <button
+            onClick={handleLogout}
+            className="w-8 h-8 rounded-full border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-400 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
+            title="Đăng xuất khỏi hệ thống"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
 
       </header>

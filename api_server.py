@@ -175,6 +175,10 @@ class UserCreateRequest(BaseModel):
     role: Optional[str] = "Content Creator"
     password: Optional[str] = "password123"
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
 
 # ============================================================
 # === REST ENDPOINTS ===
@@ -471,6 +475,38 @@ def delete_user_endpoint(user_id: int):
     try:
         ok = crud.delete_user(conn, user_id)
         return {"success": ok, "message": f"Đã xóa người dùng #{user_id}."}
+    finally:
+        conn.close()
+
+
+@app.post("/api/auth/login")
+@app.post("/api/login")
+def login_endpoint(req: LoginRequest):
+    """Xác thực đăng nhập tài khoản thực từ cơ sở dữ liệu PostgreSQL."""
+    conn = get_connection()
+    try:
+        user = crud.authenticate_user(conn, req.username, req.password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Tên đăng nhập hoặc mật khẩu không chính xác, hoặc tài khoản đã bị vô hiệu hóa.")
+        
+        full_name = user.get("full_name") or user.get("username")
+        words = full_name.split()
+        initials = "".join([w[0] for w in words[:2]]).upper() if words else "US"
+
+        return {
+            "success": True,
+            "user": {
+                "id": user.get("id"),
+                "username": user.get("username"),
+                "name": full_name,
+                "initials": initials,
+                "email": user.get("email") or f"{user.get('username')}@marketing.ai",
+                "role": user.get("role") or "Marketing Lead",
+                "status": "Active" if user.get("is_active") else "Disabled",
+                "two_fa": True
+            },
+            "token": f"aura_jwt_token_{user.get('id')}_{int(time.time())}"
+        }
     finally:
         conn.close()
 
