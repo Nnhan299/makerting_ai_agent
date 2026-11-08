@@ -420,9 +420,9 @@ export default function App() {
               {currentUser?.initials || (currentUser?.name || 'NH').slice(0, 2).toUpperCase()}
             </button>
 
-            {/* User Dropdown with User Switcher */}
+            {/* User Dropdown Profile Menu */}
             {userDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 z-50 text-xs animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 z-50 text-xs animate-in fade-in zoom-in-95">
                 {/* Current Active User Card */}
                 <div className="p-3 bg-gradient-to-br from-indigo-50/70 to-purple-50/70 rounded-xl border border-indigo-100 flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold font-mono text-sm shadow-sm shrink-0 ${
@@ -448,112 +448,44 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Section: Chuyển đổi người dùng (Switch User) */}
-                <div className="pt-2.5 pb-1">
-                  <div className="text-[10px] font-mono text-slate-400 font-bold uppercase px-2 mb-1 flex items-center justify-between">
-                    <span>CHUYỂN ĐỔI TÀI KHOẢN</span>
-                    <span className="text-indigo-600 font-bold">{users.length} người dùng</span>
-                  </div>
-
-                  <div className="space-y-1 max-h-52 overflow-y-auto">
-                    {users.map((u) => {
-                      const isActive = u.id === currentUser?.id || u.username === currentUser?.username;
-                      return (
-                        <button
-                          key={u.id}
-                          onClick={() => handleSwitchUser(u)}
-                          className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
-                            isActive
-                              ? 'bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold shadow-2xs'
-                              : 'hover:bg-slate-50 text-slate-700 font-medium'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white font-mono font-bold text-[11px] shrink-0 ${
-                              u.role === 'Admin' || u.role === 'System Admin'
-                                ? 'bg-purple-600'
-                                : u.role === 'Marketing Lead'
-                                ? 'bg-[#4F46E5]'
-                                : 'bg-emerald-600'
-                            }`}>
-                              {u.initials || (u.name || u.username).slice(0, 2).toUpperCase()}
-                            </div>
-                            <div className="min-w-0 truncate">
-                              <div className="truncate text-slate-900">{u.name}</div>
-                              <div className="text-[10px] text-slate-400 font-mono truncate">{u.role}</div>
-                            </div>
-                          </div>
-
-                          {isActive ? (
-                            <span className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-md border border-indigo-200 shrink-0">
-                              <Check className="w-3 h-3 stroke-[3]" /> Hiện tại
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-semibold text-slate-400 hover:text-indigo-600 shrink-0">
-                              Chuyển &rarr;
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Footer links & Actions */}
-                <div className="border-t border-slate-100 mt-2 pt-2 space-y-1.5">
+                {/* Actions & Navigation */}
+                <div className="pt-2 space-y-1">
                   <button 
                     onClick={() => {
                       setUserDropdownOpen(false);
                       setActiveNav('Admin & System');
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center justify-between text-slate-700 cursor-pointer"
+                    className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-slate-50 flex items-center justify-between text-slate-700 cursor-pointer transition"
                   >
                     <span className="flex items-center gap-2">
                       <Settings className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Quản lý tài khoản & RBAC</span>
+                      <span className="font-medium">Quản lý hệ thống & Phân quyền</span>
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">&rarr;</span>
                   </button>
 
-                  <button 
-                    onClick={handleLogout}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-indigo-50 text-indigo-700 font-semibold flex items-center justify-between transition cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <LogIn className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Đăng nhập tài khoản khác...</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-indigo-400">&rarr;</span>
-                  </button>
-
-                  <button 
-                    onClick={handleLogout}
-                    className="w-full text-left px-2.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold flex items-center justify-between border border-red-200 transition cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <LogOut className="w-3.5 h-3.5 text-red-600" />
-                      <span>Đăng xuất (Sign out)</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-red-500 font-bold">&rarr;</span>
-                  </button>
-
-                  <div className="px-2 py-1 text-[11px] text-slate-500 font-mono flex items-center justify-between border-t border-slate-100 pt-1.5">
-                    <span>Database:</span>
+                  <div className="px-2.5 py-1 text-[11px] text-slate-500 font-mono flex items-center justify-between border-t border-slate-100 pt-2">
+                    <span>Cơ sở dữ liệu:</span>
                     <strong className="text-emerald-700 font-bold">{dbInfo?.engine || 'PostgreSQL 16'}</strong>
+                  </div>
+
+                  {/* Sign Out Button */}
+                  <div className="pt-1.5 border-t border-slate-100">
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold flex items-center justify-between border border-red-200 transition cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        <LogOut className="w-3.5 h-3.5 text-red-600" />
+                        <span>Đăng xuất (Sign out)</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-red-500 font-bold">&rarr;</span>
+                    </button>
                   </div>
                 </div>
               </div>
             )}
           </div>
-
-          {/* Quick 1-Click Logout Button next to Avatar */}
-          <button
-            onClick={handleLogout}
-            className="w-8 h-8 rounded-full border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-400 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
-            title="Đăng xuất khỏi hệ thống"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
         </div>
 
       </header>
