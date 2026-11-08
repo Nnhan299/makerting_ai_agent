@@ -7,7 +7,8 @@ import {
   Plus,
   ShieldCheck,
   Settings,
-  Database
+  Database,
+  Check
 } from 'lucide-react';
 
 import StudioCanvas from './pages/StudioCanvas';
@@ -20,6 +21,7 @@ import {
   fetchHealth, 
   fetchCampaigns, 
   fetchPosts, 
+  fetchUsers,
   createCampaignApi, 
   deleteCampaignApi,
   updatePostApi 
@@ -31,6 +33,30 @@ export default function App() {
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [dbInfo, setDbInfo] = useState({ engine: 'PostgreSQL 16', status: 'connected', latency_ms: 22 });
+
+  // User Accounts & Authentication State
+  const defaultUsers = [
+    { id: 2, username: 'nhan', name: 'Nguyễn Hoàng Nhân (Lead)', initials: 'NH', email: 'nhan_2251220268@dau.edu.vn', role: 'Marketing Lead', status: 'Active' },
+    { id: 1, username: 'admin', name: 'Quản trị viên Hệ thống', initials: 'QT', email: 'admin@marketing.ai', role: 'Admin', status: 'Active' },
+    { id: 3, username: 'creator', name: 'Trần Thị Mai (Creator)', initials: 'TT', email: 'mai.tran@marketing.ai', role: 'Content Creator', status: 'Active' }
+  ];
+
+  const [users, setUsers] = useState(defaultUsers);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aura_active_user');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return defaultUsers[0];
+  });
+
+  const handleSwitchUser = (userToSwitch) => {
+    setCurrentUser(userToSwitch);
+    try {
+      localStorage.setItem('aura_active_user', JSON.stringify(userToSwitch));
+    } catch (e) {}
+    setUserDropdownOpen(false);
+  };
 
   // Global campaigns list (initially fallback, then populated from DB)
   const [campaigns, setCampaigns] = useState([
@@ -185,6 +211,16 @@ export default function App() {
           date_str: `Ngày ${p.scheduled_date || '2026-10-15'}`
         })));
       }
+
+      // 4. Fetch live users from PostgreSQL
+      const remoteUsers = await fetchUsers();
+      if (remoteUsers && remoteUsers.length > 0) {
+        setUsers(remoteUsers);
+        setCurrentUser(prev => {
+          const found = remoteUsers.find(u => u.id === prev.id || u.username === prev.username);
+          return found || remoteUsers[0];
+        });
+      }
     }
 
     loadData();
@@ -337,56 +373,117 @@ export default function App() {
           <div className="relative">
             <button 
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="w-8 h-8 rounded-full bg-[#4F46E5] flex items-center justify-center text-white shadow-sm cursor-pointer hover:ring-2 hover:ring-indigo-300 transition"
-              title="Tài khoản Nhan Tran (nhan_2251220268@dau.edu.vn)"
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-mono font-bold text-xs shadow-sm cursor-pointer hover:ring-2 hover:ring-indigo-300 transition ${
+                currentUser?.role === 'Admin' || currentUser?.role === 'System Admin'
+                  ? 'bg-purple-600'
+                  : currentUser?.role === 'Marketing Lead'
+                  ? 'bg-[#4F46E5]'
+                  : 'bg-emerald-600'
+              }`}
+              title={`Tài khoản: ${currentUser?.name} (${currentUser?.role})`}
             >
-              <User className="w-4 h-4" />
+              {currentUser?.initials || (currentUser?.name || 'NH').slice(0, 2).toUpperCase()}
             </button>
 
-            {/* User Dropdown */}
+            {/* User Dropdown with User Switcher */}
             {userDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 z-50 text-xs animate-in fade-in zoom-in-95">
-                <div className="pb-2 border-b border-slate-100">
-                  <div className="font-bold text-slate-900">Nhan Tran</div>
-                  <div className="text-[11px] text-slate-400 font-mono">nhan_2251220268@dau.edu.vn</div>
-                  <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px]">
-                    Marketing Lead
-                  </span>
-                </div>
-                <div className="py-1 space-y-1">
-                  <div className="px-2 py-1.5 text-slate-600 font-mono text-[11px] flex items-center justify-between">
-                    <span>Database:</span>
-                    <strong className="text-emerald-700 font-bold">{dbInfo.engine}</strong>
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 z-50 text-xs animate-in fade-in zoom-in-95">
+                {/* Current Active User Card */}
+                <div className="p-3 bg-gradient-to-br from-indigo-50/70 to-purple-50/70 rounded-xl border border-indigo-100 flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold font-mono text-sm shadow-sm shrink-0 ${
+                    currentUser?.role === 'Admin' || currentUser?.role === 'System Admin'
+                      ? 'bg-purple-600'
+                      : currentUser?.role === 'Marketing Lead'
+                      ? 'bg-[#4F46E5]'
+                      : 'bg-emerald-600'
+                  }`}>
+                    {currentUser?.initials || (currentUser?.name || 'NH').slice(0, 2).toUpperCase()}
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 text-sm truncate">{currentUser?.name}</div>
+                    <div className="text-[11px] text-slate-500 font-mono truncate">{currentUser?.email}</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-700 font-mono font-bold text-[10px]">
+                        {currentUser?.role}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Online
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section: Chuyển đổi người dùng (Switch User) */}
+                <div className="pt-2.5 pb-1">
+                  <div className="text-[10px] font-mono text-slate-400 font-bold uppercase px-2 mb-1 flex items-center justify-between">
+                    <span>CHUYỂN ĐỔI TÀI KHOẢN</span>
+                    <span className="text-indigo-600 font-bold">{users.length} người dùng</span>
+                  </div>
+
+                  <div className="space-y-1 max-h-52 overflow-y-auto">
+                    {users.map((u) => {
+                      const isActive = u.id === currentUser?.id || u.username === currentUser?.username;
+                      return (
+                        <button
+                          key={u.id}
+                          onClick={() => handleSwitchUser(u)}
+                          className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
+                            isActive
+                              ? 'bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold shadow-2xs'
+                              : 'hover:bg-slate-50 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white font-mono font-bold text-[11px] shrink-0 ${
+                              u.role === 'Admin' || u.role === 'System Admin'
+                                ? 'bg-purple-600'
+                                : u.role === 'Marketing Lead'
+                                ? 'bg-[#4F46E5]'
+                                : 'bg-emerald-600'
+                            }`}>
+                              {u.initials || (u.name || u.username).slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 truncate">
+                              <div className="truncate text-slate-900">{u.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono truncate">{u.role}</div>
+                            </div>
+                          </div>
+
+                          {isActive ? (
+                            <span className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-md border border-indigo-200 shrink-0">
+                              <Check className="w-3 h-3 stroke-[3]" /> Hiện tại
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-slate-400 hover:text-indigo-600 shrink-0">
+                              Chuyển &rarr;
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Footer links */}
+                <div className="border-t border-slate-100 mt-2 pt-2 space-y-1">
                   <button 
                     onClick={() => {
                       setUserDropdownOpen(false);
                       setActiveNav('Admin & System');
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center justify-between text-slate-700"
                   >
-                    <Settings className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Cấu hình hệ thống</span>
+                    <span className="flex items-center gap-2">
+                      <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Quản lý tài khoản & RBAC</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">&rarr;</span>
                   </button>
-                  <button 
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      setActiveNav('Brand Rules');
-                    }}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Quy tắc thương hiệu</span>
-                  </button>
-                </div>
-                <div className="pt-1 border-t border-slate-100">
-                  <button 
-                    onClick={() => setUserDropdownOpen(false)}
-                    className="w-full text-left px-2 py-1.5 rounded-lg text-emerald-600 font-bold flex items-center gap-2"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span>DB Connection: 22ms</span>
-                  </button>
+
+                  <div className="px-2 py-1 text-[11px] text-slate-500 font-mono flex items-center justify-between border-t border-slate-50 pt-1.5">
+                    <span>Database:</span>
+                    <strong className="text-emerald-700 font-bold">{dbInfo?.engine || 'PostgreSQL 16'}</strong>
+                  </div>
                 </div>
               </div>
             )}
@@ -437,7 +534,10 @@ export default function App() {
         )}
 
         {activeNav === 'Admin & System' && (
-          <AdminPortal />
+          <AdminPortal 
+            currentUser={currentUser}
+            onSwitchUser={handleSwitchUser}
+          />
         )}
 
       </main>

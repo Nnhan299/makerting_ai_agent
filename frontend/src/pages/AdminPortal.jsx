@@ -23,7 +23,7 @@ import {
 
 import { fetchUsers, createUserApi, deleteUserApi } from '../api';
 
-export default function AdminPortal() {
+export default function AdminPortal({ currentUser, onSwitchUser }) {
   const [activeTab, setActiveTab] = useState('users');
   const [apiKeySaved, setApiKeySaved] = useState(false);
   const [cacheCleared, setCacheCleared] = useState(false);
@@ -391,15 +391,31 @@ export default function AdminPortal() {
                     </td>
 
                     <td className="py-3 px-3 text-right">
-                      {u.username !== 'admin' && (
-                        <button 
-                          onClick={() => handleDeleteUser(u.id)}
-                          className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"
-                          title="Xóa thành viên"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {currentUser?.id === u.id || currentUser?.username === u.username ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[11px]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Đang dùng</span>
+                          </span>
+                        ) : (
+                          <button 
+                            onClick={() => onSwitchUser && onSwitchUser(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] transition cursor-pointer active:scale-95"
+                            title="Chuyển sang đăng nhập với tài khoản này"
+                          >
+                            <span>Chuyển tài khoản</span>
+                          </button>
+                        )}
+                        {u.username !== 'admin' && (
+                          <button 
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                            title="Xóa thành viên"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
