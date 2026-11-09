@@ -20,10 +20,74 @@ import {
   Bookmark,
   Heart,
   Send,
-  Loader2
+  Loader2,
+  FileText,
+  Users
 } from 'lucide-react';
 
 import { updatePostApi } from '../api';
+
+// ── Local 3-layer compliance check (no API call needed for demo) ──
+function runLocalComplianceCheck(content, postKind, disclosureLabel) {
+  const findings = [];
+  const text = (content || '').toLowerCase();
+
+  // CORE-001: absolute commitment
+  ['cam kết 100%', 'đảm bảo 100%', 'chắc chắn 100%'].forEach(kw => {
+    if (text.includes(kw)) findings.push({
+      rule_code: 'CORE-001', severity: 'critical', matched_text: kw,
+      message: 'Cam kết tuyệt đối không có bằng chứng.',
+      suggestion: 'Dùng: "có thể giúp cải thiện..."'
+    });
+  });
+
+  // CORE-002: superlative language
+  ['số 1', 'tốt nhất', 'duy nhất'].forEach(kw => {
+    if (text.includes(kw)) findings.push({
+      rule_code: 'CORE-002', severity: 'warning', matched_text: kw,
+      message: 'Từ ngữ tuyệt đối yêu cầu bằng chứng.',
+      suggestion: 'Thêm nguồn hoặc giải thích cụ thể.'
+    });
+  });
+
+  // COS-001: medical treatment language
+  ['chữa khỏi', 'trị dứt điểm', 'điều trị', 'thần dược'].forEach(kw => {
+    if (text.includes(kw)) findings.push({
+      rule_code: 'COS-001', severity: 'critical', matched_text: kw,
+      message: 'Ngôn ngữ điều trị bệnh không được dùng cho mỹ phẩm.',
+      suggestion: 'Dùng: "giúp làm dịu", "hỗ trợ cải thiện"'
+    });
+  });
+
+  // CORE-003: missing disclosure label
+  if ((postKind === 'paid_ad' || postKind === 'creator_partnership') && !disclosureLabel) {
+    findings.push({
+      rule_code: 'CORE-003', severity: 'critical', matched_text: '(thiếu nhãn)',
+      message: 'Bài có quan hệ thương mại phải có nhãn quảng cáo.',
+      suggestion: 'Thêm #QuảngCáo hoặc "Nội dung được tài trợ"'
+    });
+  }
+
+  const nCritical = findings.filter(f => f.severity === 'critical').length;
+  const nWarning  = findings.filter(f => f.severity === 'warning').length;
+  const score     = Math.max(0, 100 - 40 * nCritical - 10 * nWarning);
+  const riskLevel = nCritical > 0 ? 'critical' : nWarning > 0 ? 'warning' : 'low';
+
+  return { score, riskLevel, findings, nCritical };
+}
+
+// ── Severity badge styling map ──
+const FINDING_STYLES = {
+  critical: { border: 'border-rose-200',   bg: 'bg-rose-50/80',     codeBg: 'bg-rose-100 text-rose-700',   label: 'Nghiêm trọng' },
+  warning:  { border: 'border-amber-200', bg: 'bg-amber-50/80',   codeBg: 'bg-amber-100 text-amber-700', label: 'Cảnh báo' },
+  info:     { border: 'border-indigo-200', bg: 'bg-indigo-50/80',  codeBg: 'bg-indigo-100 text-indigo-700', label: 'Lưu ý' },
+};
+
+const SCORE_STYLES = {
+  critical: 'bg-red-600 text-white',
+  warning:  'bg-amber-500 text-white',
+  low:      'bg-emerald-600 text-white',
+};
 
 export default function StudioCanvas({ currentCampaign, onApprovePost, isApproved, setIsApproved }) {
   const [activeChannel, setActiveChannel] = useState('Facebook Feed');
@@ -32,6 +96,9 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
   const [showEditModal, setShowEditModal] = useState(false);
   const [isRunningPipeline, setIsRunningPipeline] = useState(false);
   const [pipelineStep, setPipelineStep] = useState(0);
+  const [complianceResult, setComplianceResult] = useState(null);
+  const [postKind, setPostKind] = useState('organic');
+  const [disclosureLabel, setDisclosureLabel] = useState('');
 
   // Editable post content state
   const [postContent, setPostContent] = useState({
@@ -101,12 +168,10 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
             {/* Header: PureGlow 2026 */}
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-mono font-bold text-slate-400 tracking-wider uppercase block">
-                  AURA STUDIO V2.4
-                </span>
-                <h2 className="text-base font-extrabold text-slate-900 leading-tight">
+                <h2 className="text-base font-bold text-slate-900 leading-tight">
                   {currentCampaign?.name ? currentCampaign.name.replace('Chiến dịch ', '').slice(0, 18) : 'PureGlow 2026'}
                 </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Điều phối 3 Agents & ngữ cảnh</p>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold font-mono border border-emerald-200 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -116,9 +181,9 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
 
             {/* Pipeline Agents Section */}
             <div className="space-y-2 pt-1 border-t border-slate-100">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 font-mono">
-                <span>PIPELINE AGENTS</span>
-                <span>3 Nodes</span>
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                <span>Ma trận điều phối Agent</span>
+                <span className="text-[10px] font-mono text-slate-400">3 Nodes Live</span>
               </div>
 
               {/* Agent 1 Card */}
@@ -167,10 +232,10 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
                   ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-200'
                   : hasAppliedFix
                   ? 'bg-emerald-50/50 border-emerald-200'
-                  : 'bg-red-50/50 border-red-200/80'
+                  : 'bg-rose-50/50 border-rose-200/80'
               } flex items-start gap-2.5`}>
                 <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                  hasAppliedFix ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                  hasAppliedFix ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'
                 }`}>
                   {pipelineStep === 3 ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -186,7 +251,7 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
                     <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
                       hasAppliedFix 
                         ? 'text-emerald-700 bg-emerald-100 border-emerald-200' 
-                        : 'text-red-600 bg-red-100/80 border-red-200'
+                        : 'text-rose-600 bg-rose-100/80 border-rose-200'
                     }`}>
                       {hasAppliedFix ? '0 Cảnh báo' : '1 Cảnh báo'}
                     </span>
@@ -200,8 +265,8 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
 
             {/* Tham Số Brief Section */}
             <div className="space-y-3 pt-2 border-t border-slate-100 text-xs">
-              <span className="text-[11px] font-bold text-slate-400 font-mono block">
-                THAM SỐ BRIEF
+              <span className="text-xs font-semibold text-slate-700 block">
+                Tham số Brief chiến dịch
               </span>
 
               {/* Giọng điệu */}
@@ -209,7 +274,7 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
                 <span className="text-slate-500 text-[11px]">Giọng điệu thương hiệu</span>
                 <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800">
                   <span className="flex items-center gap-1.5">
-                    <span>💡</span> Chuyên gia & Thân thiện
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Chuyên gia & Thân thiện
                   </span>
                   <span className="text-slate-400 text-xs">⇅</span>
                 </div>
@@ -220,7 +285,7 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
                 <span className="text-slate-500 text-[11px]">Đối tượng mục tiêu</span>
                 <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800">
                   <span>Phụ nữ 25-35 • Da nhạy cảm</span>
-                  <span className="text-slate-400 text-[11px]">👥</span>
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
                 </div>
               </div>
 
@@ -228,16 +293,16 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-slate-500">Từ cấm theo dõi</span>
-                  <span className="text-red-500 font-mono font-bold">14 từ cấm</span>
+                  <span className="text-rose-600 font-mono font-bold">14 từ cấm</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[11px] font-semibold border border-red-200/80">
+                  <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[11px] font-semibold border border-rose-200/80">
                     trị dứt điểm
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-red-100/90 text-red-700 text-[11px] font-bold border border-red-300">
+                  <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-bold border border-rose-300">
                     cam kết 100%
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[11px] font-semibold border border-red-200/80">
+                  <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[11px] font-semibold border border-rose-200/80">
                     thần dược
                   </span>
                   <span className="text-slate-400 text-[11px] self-center ml-1">+11 khác</span>
@@ -281,20 +346,21 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
           <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
             <div className="flex items-center gap-1">
               {[
-                { id: 'Facebook Feed', icon: '📄', label: 'Facebook Feed' },
-                { id: 'TikTok Script Card', icon: '🎬', label: 'TikTok Script Card' },
-                { id: 'Instagram Carousel', icon: '📸', label: 'Instagram Carousel' }
+                { id: 'Facebook Feed', icon: FileText, label: 'Facebook Feed' },
+                { id: 'TikTok Script Card', icon: Video, label: 'TikTok Script Card' },
+                { id: 'Instagram Carousel', icon: Layers, label: 'Instagram Carousel' }
               ].map(ch => {
                 const isSelected = activeChannel === ch.id;
+                const IconComponent = ch.icon;
                 return (
                   <button
                     key={ch.id}
                     onClick={() => setActiveChannel(ch.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      isSelected ? 'bg-slate-100 text-[#4F46E5]' : 'text-slate-500 hover:text-slate-800'
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <span>{ch.icon}</span>
+                    <IconComponent className="w-3.5 h-3.5" />
                     <span>{ch.label}</span>
                   </button>
                 );
@@ -501,12 +567,10 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
             {/* Header: Compliance Guard */}
             <div className="flex items-start justify-between pb-2 border-b border-slate-100">
               <div>
-                <span className="text-[10px] font-mono font-bold text-slate-400 tracking-wider uppercase block">
-                  KIỂM ĐỊNH NỘI DUNG
-                </span>
-                <h3 className="text-base font-extrabold text-slate-900 leading-tight">
-                  Compliance Guard
+                <h3 className="text-base font-bold text-slate-900 leading-tight">
+                  Kiểm định Tuân thủ
                 </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Sàng lọc từ cấm & an toàn thương hiệu</p>
               </div>
               <ShieldCheck className="w-5 h-5 text-indigo-600" />
             </div>
@@ -515,7 +579,7 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-500 font-medium">Chỉ số tuân thủ</span>
+                  <span className="text-xs text-slate-500 font-medium">Chỉ số tuân thủ</span>
                   <div className="text-3xl font-black text-slate-900 tracking-tight">
                     {hasAppliedFix ? '98' : '88'}<span className="text-sm font-bold text-slate-400">/100</span>
                   </div>
@@ -547,47 +611,47 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
                 </div>
               </div>
               
-              <div className={`text-[11px] font-medium flex items-center gap-1 ${
-                hasAppliedFix ? 'text-emerald-600' : 'text-red-500'
+              <div className={`text-xs font-semibold flex items-center gap-1.5 ${
+                hasAppliedFix ? 'text-emerald-700' : 'text-rose-600'
               }`}>
-                <span>ⓘ</span>
-                <span>{hasAppliedFix ? 'Đã đạt chuẩn an toàn thương hiệu 100%' : 'Cần chỉnh sửa từ cấm'}</span>
+                {hasAppliedFix ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                <span>{hasAppliedFix ? 'Đạt chuẩn an toàn thương hiệu 100%' : 'Phát hiện từ ngữ vi phạm'}</span>
               </div>
             </div>
 
             {/* Red Alert Card */}
             {!hasAppliedFix && (
-              <div className="p-3 rounded-xl bg-red-50/70 border border-red-200 text-xs space-y-1">
-                <div className="font-bold text-red-700 flex items-center gap-1 text-[11px]">
-                  <span>ⓘ</span>
+              <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 text-xs space-y-1">
+                <div className="font-bold text-rose-700 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span>Phát hiện từ cấm tuyệt đối</span>
                 </div>
-                <p className="text-[11px] text-red-600 leading-relaxed">
-                  Từ ngữ: <strong>"cam kết 100%"</strong> vi phạm điều lệ quảng cáo mỹ phẩm & bảo vệ người tiêu dùng số 18/2024.
+                <p className="text-xs text-rose-600 leading-relaxed">
+                  Cụm từ <strong>"cam kết 100%"</strong> vi phạm điều lệ quy chuẩn quảng cáo mỹ phẩm & bảo vệ người tiêu dùng.
                 </p>
               </div>
             )}
 
             {/* AI Optimization Suggestion Card */}
-            <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200/90 text-xs space-y-2">
+            <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200/90 text-xs space-y-2">
               <div className="flex items-center justify-between font-bold">
-                <span className="flex items-center gap-1 text-indigo-900 text-[11px]">
+                <span className="flex items-center gap-1.5 text-indigo-900">
                   <Wand2 className="w-3.5 h-3.5 text-indigo-600" />
-                  Đề xuất AI Tối ưu
+                  Đề xuất AI Tối ưu an toàn
                 </span>
                 <span className="text-emerald-700 font-mono text-[10px] bg-emerald-100 px-1.5 py-0.2 rounded font-bold">
                   +10 Điểm
                 </span>
               </div>
 
-              <div className="space-y-1 text-[11px]">
-                <div className="text-slate-500 font-mono">
-                  GỐC (VI PHẠM):
+              <div className="space-y-1 text-xs">
+                <div className="text-slate-500 font-mono text-[10px]">
+                  BẢN GỐC (VI PHẠM):
                 </div>
-                <div className="text-red-500 line-through font-medium">
+                <div className="text-rose-600 line-through font-medium">
                   "...cam kết 100% phục hồi..."
                 </div>
-                <div className="text-slate-500 font-mono pt-1">
+                <div className="text-slate-500 font-mono text-[10px] pt-1">
                   ĐỀ XUẤT AN TOÀN:
                 </div>
                 <div className="text-emerald-700 font-semibold">
@@ -598,17 +662,17 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
               {/* Action Button: Áp dụng gợi ý ngay */}
               <button 
                 onClick={handleApplyFix}
-                className="w-full bg-[#4F46E5] hover:bg-[#4338CA] text-white py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-[0.98]"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-[0.98] cursor-pointer"
               >
                 <Wand2 className="w-3.5 h-3.5" />
-                <span>{hasAppliedFix ? 'Khôi phục bản gốc ban đầu' : 'Áp dụng gợi ý ngay'}</span>
+                <span>{hasAppliedFix ? 'Khôi phục bản gốc ban đầu' : 'Áp dụng đề xuất an toàn'}</span>
               </button>
             </div>
 
             {/* Checklist: Hạng mục kiểm tra */}
             <div className="space-y-2 pt-1 border-t border-slate-100 text-xs">
-              <div className="text-[11px] font-bold text-slate-400 font-mono">
-                HẠNG MỤC KIỂM TRA
+              <div className="text-xs font-semibold text-slate-700">
+                Hạng mục kiểm định tuân thủ
               </div>
 
               <div className="space-y-1.5">
