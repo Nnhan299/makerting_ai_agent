@@ -417,11 +417,11 @@ export default function CalendarReview({ posts, setPosts, onNavigateToStudio }) 
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
             
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <span className="text-[10px] font-mono font-bold text-[#3525CD] uppercase">
-                BẢN XEM TRƯỚC BÀI ĐĂNG #{selectedPost.id}
-              </span>
+              <h4 className="font-bold text-sm text-slate-900">
+                Chi tiết bài đăng #{selectedPost.id}
+              </h4>
               <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                selectedPost.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'
+                selectedPost.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'
               }`}>
                 ● {selectedPost.status}
               </span>

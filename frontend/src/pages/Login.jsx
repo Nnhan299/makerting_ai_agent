@@ -110,7 +110,6 @@ export default function Login({ onLoginSuccess }) {
 
             {/* Hero Copy */}
             <div className="brand-hero">
-              <div className="hero-eyebrow mono-text">NEXT-GEN CREATIVE OPS</div>
               <h1 className="hero-title">
                 Autonomous Marketing Intelligence 2026
               </h1>
@@ -122,7 +121,7 @@ export default function Login({ onLoginSuccess }) {
             {/* Multi-Agent Pipeline Section */}
             <div className="pipeline-section">
               <div className="pipeline-header">
-                <span className="pipeline-title mono-text">HỆ THỐNG TỰ HÀNH ĐA AGENT</span>
+                <span className="pipeline-title font-semibold text-slate-300">Ma trận Điều phối Đa Agent</span>
                 <span className="pipeline-line"></span>
                 <span className="pipeline-status mono-text">
                   <span className="dot-live"></span>

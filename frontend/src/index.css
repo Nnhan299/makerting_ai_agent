@@ -4,11 +4,28 @@
 
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    caret-color: #4F46E5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: #E0E7FF;
+    color: #3730A3;
+  }
+
+  *:focus-visible {
+    outline: 2px solid #6366F1;
+    outline-offset: 2px;
+  }
+
+  .font-mono, td, [data-tabular] {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Custom scrollbars */
+/* Custom scrollbars themed to design palette */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

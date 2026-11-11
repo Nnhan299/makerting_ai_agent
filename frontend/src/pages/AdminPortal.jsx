@@ -130,18 +130,11 @@ export default function AdminPortal({ currentUser, onSwitchUser }) {
       {/* ------------------------------------------------------------ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200/80">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#3525CD] font-bold uppercase tracking-wider mb-1">
-            <span>SRS-FR-ADM · v4.1</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-            <span className="text-slate-500 font-normal">HLD: ui/pages/6_admin.py</span>
-          </div>
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Hệ Thống Quản Trị & System Governance
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Giám sát tài nguyên suy luận LLM, bảo mật phân quyền RBAC đa cấp, và quản lý chuỗi kết nối lưu trữ tập trung.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Quản trị Hệ thống
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Giám sát tài nguyên suy luận LLM, bảo mật phân quyền RBAC đa cấp và quản lý cấu hình kết nối lưu trữ tập trung.
           </p>
         </div>
 

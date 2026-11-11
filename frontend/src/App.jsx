@@ -19,6 +19,8 @@ import Campaigns from './pages/Campaigns';
 import BrandRules from './pages/BrandRules';
 import CalendarReview from './pages/CalendarReview';
 import AdminPortal from './pages/AdminPortal';
+import MarketAnalysis from './pages/MarketAnalysis';
+import PerformanceControl from './pages/PerformanceControl';
 
 import { 
   fetchHealth, 
@@ -27,6 +29,7 @@ import {
   fetchUsers,
   createCampaignApi, 
   deleteCampaignApi,
+  updateCampaignApi,
   updatePostApi 
 } from './api';
 
@@ -131,6 +134,34 @@ export default function App() {
       channels: ['TikTok', 'Instagram'],
       start_date: '2026-11-15',
       end_date: '2026-12-15'
+    },
+    {
+      id: 4,
+      sku: 'CAM-2025-TT04',
+      name: 'Bộ Trị Mụn Tràm Trà TeaTree 2025',
+      product_name: 'Bộ Trị Mụn Tràm Trà TeaTree & Zinc Duo',
+      target_audience: 'Học sinh, sinh viên 15 - 22 • Da dầu mụn dậy thì',
+      budget: '$12,000 USD',
+      status: 'Completed',
+      compliance_rate: 97.2,
+      posts_count: 18,
+      channels: ['TikTok', 'Instagram'],
+      start_date: '2025-08-01',
+      end_date: '2025-09-01'
+    },
+    {
+      id: 5,
+      sku: 'CAM-2025-GX05',
+      name: 'Gel Rửa Mặt Trà Xanh Detox Pure 2025',
+      product_name: 'Gel Rửa Mặt Trà Xanh BHA 1%',
+      target_audience: 'Nhân viên văn phòng 22 - 30 • Làm sạch sâu lỗ chân lông',
+      budget: '$14,500 USD',
+      status: 'Completed',
+      compliance_rate: 96.8,
+      posts_count: 24,
+      channels: ['Facebook', 'TikTok', 'Instagram'],
+      start_date: '2025-09-15',
+      end_date: '2025-10-30'
     }
   ]);
 
@@ -297,6 +328,17 @@ export default function App() {
     }
   };
 
+  const handleUpdateCampaign = async (id, data) => {
+    await updateCampaignApi(id, data);
+    const updated = await fetchCampaigns();
+    if (updated && updated.length > 0) {
+      setCampaigns(updated);
+      // Cập nhật currentCampaign nếu đang edit nó
+      const updatedCamp = updated.find(c => c.id === id);
+      if (updatedCamp) setCurrentCampaign(updatedCamp);
+    }
+  };
+
   // If not authenticated, render the Enterprise Login Screen
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
@@ -308,37 +350,41 @@ export default function App() {
       {/* ============================================================ */}
       {/* 1. TOP NAVIGATION STUDIO HEADER                              */}
       {/* ============================================================ */}
-      <header className="bg-white border-b border-slate-200/80 px-5 py-2.5 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-6 py-2 flex items-center justify-between sticky top-0 z-40">
         
         {/* Left: Brand Logo & Project Dropdown */}
         <div className="flex items-center gap-3">
           <div 
             onClick={() => setActiveNav('AI Pipeline')}
-            className="flex items-center gap-2 bg-[#4F46E5] text-white px-3 py-1.5 rounded-xl font-extrabold text-sm shadow-sm shadow-indigo-500/20 cursor-pointer select-none"
+            className="flex items-center gap-2 text-indigo-600 font-black text-sm tracking-tight cursor-pointer select-none px-1"
           >
-            <Sparkles className="w-4 h-4 fill-white" />
-            <span>AuraAI</span>
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 fill-white" />
+            </div>
+            <span className="text-slate-900 text-base">Aura<span className="text-indigo-600">AI</span></span>
           </div>
+
+          <div className="h-4 w-px bg-slate-200" />
 
           {/* Project Switcher Dropdown */}
           <div className="relative">
             <button
               onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-              className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer transition select-none"
+              className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 cursor-pointer transition select-none"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>{currentCampaign?.name || 'Serum PureGlow 2026'}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <span className="max-w-[140px] truncate">{currentCampaign?.name || 'Serum PureGlow 2026'}</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {/* Dropdown Menu */}
             {projectDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95">
-                <div className="text-[10px] font-mono text-slate-400 font-bold uppercase px-3 py-1 flex justify-between items-center">
-                  <span>DỰ ÁN TỪ DATABASE</span>
-                  <span className="text-emerald-600 font-bold">● {(dbInfo?.engine || 'PostgreSQL 16').split(' ')[0]}</span>
+              <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-50">
+                <div className="text-[10px] font-mono text-slate-400 font-bold uppercase px-2.5 py-1 flex justify-between items-center">
+                  <span>DỰ ÁN HIỆN CÓ</span>
+                  <span className="text-emerald-600 font-bold">● Active</span>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5 mt-0.5">
                   {campaigns.map(camp => (
                     <button
                       key={camp.id}
@@ -346,14 +392,14 @@ export default function App() {
                         setCurrentCampaign(camp);
                         setProjectDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition ${
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition ${
                         currentCampaign?.id === camp.id 
-                          ? 'bg-[#EBF2FF] text-[#2563EB]' 
+                          ? 'bg-indigo-50 text-indigo-700 font-bold' 
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <span className="truncate">{camp.name}</span>
-                      <span className="text-[10px] font-mono text-slate-400">{camp.status}</span>
+                      <span className="text-[10px] font-mono text-slate-400 shrink-0 ml-2">{camp.status}</span>
                     </button>
                   ))}
                 </div>
@@ -363,10 +409,10 @@ export default function App() {
                       setProjectDropdownOpen(false);
                       setActiveNav('Campaigns');
                     }}
-                    className="w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold text-[#4F46E5] hover:bg-indigo-50 flex items-center gap-1.5 transition"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-indigo-600 hover:bg-indigo-50 flex items-center gap-1.5 transition"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Quản lý tất cả chiến dịch...</span>
+                    <Plus className="w-3 h-3" />
+                    <span>Quản lý chiến dịch...</span>
                   </button>
                 </div>
               </div>
@@ -375,20 +421,28 @@ export default function App() {
         </div>
 
         {/* Center: Module Navigation Tabs */}
-        <nav className="flex items-center gap-1">
-          {['Campaigns', 'Brand Rules', 'AI Pipeline', 'Calendar & Review', 'Admin & System'].map((tab) => {
-            const isActive = activeNav === tab;
+        <nav className="flex items-center gap-0.5 bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/60">
+          {[
+            { id: 'Market Analysis', label: 'Phân tích' },
+            { id: 'Campaigns', label: 'Chiến dịch' },
+            { id: 'AI Pipeline', label: 'AI Studio' },
+            { id: 'Brand Rules', label: 'Quy tắc' },
+            { id: 'Calendar & Review', label: 'Lịch đăng' },
+            { id: 'Performance & Control', label: 'Hiệu suất' },
+            { id: 'Admin & System', label: 'Quản trị' }
+          ].map((tab) => {
+            const isActive = activeNav === tab.id;
             return (
               <button
-                key={tab}
-                onClick={() => setActiveNav(tab)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition select-none ${
+                key={tab.id}
+                onClick={() => setActiveNav(tab.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition select-none ${
                   isActive 
-                    ? 'bg-[#EBF2FF] text-[#2563EB]' 
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    ? 'bg-white text-indigo-700 shadow-xs' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                 }`}
               >
-                {tab}
+                {tab.label}
               </button>
             );
           })}
@@ -398,21 +452,21 @@ export default function App() {
         <div className="flex items-center gap-3">
           {/* Real Database Sync Badge */}
           <div 
-            className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/80 px-3 py-1 rounded-full text-[11px] font-semibold text-emerald-700 select-none cursor-pointer"
-            title={`Đang đồng bộ trực tiếp với ${dbInfo?.engine || 'PostgreSQL 16'} (Độ trễ: ${dbInfo?.latency_ms || 22}ms)`}
+            className="hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-[11px] font-medium text-slate-600 select-none"
+            title={`Đang kết nối: ${dbInfo?.engine || 'PostgreSQL 16'} (${dbInfo?.latency_ms || 22}ms)`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>AI Pipeline Active • {(dbInfo?.engine || 'PostgreSQL 16').split(' ')[0]}</span>
+            <span>PostgreSQL Live</span>
           </div>
 
           <div className="relative">
             <button 
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-mono font-bold text-xs shadow-sm cursor-pointer hover:ring-2 hover:ring-indigo-300 transition ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-mono font-bold text-[11px] shadow-xs cursor-pointer hover:ring-2 hover:ring-indigo-300 transition ${
                 currentUser?.role === 'Admin' || currentUser?.role === 'System Admin'
                   ? 'bg-purple-600'
                   : currentUser?.role === 'Marketing Lead'
-                  ? 'bg-[#4F46E5]'
+                  ? 'bg-indigo-600'
                   : 'bg-emerald-600'
               }`}
               title={`Tài khoản: ${currentUser?.name} (${currentUser?.role})`}
@@ -495,6 +549,10 @@ export default function App() {
       {/* ============================================================ */}
       <main className="flex-1 p-4 lg:p-5 max-w-[1700px] w-full mx-auto">
         
+        {activeNav === 'Market Analysis' && (
+          <MarketAnalysis />
+        )}
+
         {activeNav === 'AI Pipeline' && (
           <StudioCanvas 
             currentCampaign={currentCampaign} 
@@ -516,6 +574,7 @@ export default function App() {
             onNavigateToCalendar={() => setActiveNav('Calendar & Review')}
             onApiCreate={handleCreateCampaign}
             onApiDelete={handleDeleteCampaign}
+            onApiUpdate={handleUpdateCampaign}
           />
         )}
 
@@ -529,6 +588,10 @@ export default function App() {
             setPosts={setPosts}
             onNavigateToStudio={() => setActiveNav('AI Pipeline')}
           />
+        )}
+
+        {activeNav === 'Performance & Control' && (
+          <PerformanceControl campaigns={campaigns} />
         )}
 
         {activeNav === 'Admin & System' && (

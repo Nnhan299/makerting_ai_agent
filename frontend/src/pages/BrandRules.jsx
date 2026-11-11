@@ -6,12 +6,53 @@ import {
   updateBrandRuleApi 
 } from '../api';
 
+const COMPLIANCE_RULES = [
+  { code: 'CORE-001', pack: 'core_ads_vn', severity: 'critical', name: 'Cam kết tuyệt đối', 
+    keywords: ['cam kết 100%', 'đảm bảo 100%', 'chắc chắn 100%'],
+    message: 'Cam kết tuyệt đối không có bằng chứng vi phạm quy định quảng cáo.',
+    suggestion: 'Dùng: "có thể giúp cải thiện..." hoặc dẫn kết quả nghiên cứu cụ thể.' },
+  { code: 'CORE-002', pack: 'core_ads_vn', severity: 'warning', name: 'Từ ngữ so sánh tuyệt đối',
+    keywords: ['số 1', 'tốt nhất', 'duy nhất', 'hàng đầu'],
+    message: 'Từ ngữ tuyệt đối yêu cầu bằng chứng kiểm chứng độc lập.',
+    suggestion: 'Thêm nguồn: "theo khảo sát X" hoặc "được chứng nhận bởi..."' },
+  { code: 'COS-001', pack: 'cosmetics_vn', severity: 'critical', name: 'Ngôn ngữ điều trị bệnh',
+    keywords: ['chữa khỏi', 'trị dứt điểm', 'điều trị', 'chữa bệnh', 'thần dược'],
+    message: 'Mỹ phẩm không được quảng cáo như thuốc điều trị bệnh.',
+    suggestion: 'Dùng: "giúp làm dịu", "hỗ trợ cải thiện", "làm giảm biểu hiện"' },
+  { code: 'COS-002', pack: 'cosmetics_vn', severity: 'critical', name: 'Thay thế thuốc',
+    keywords: ['thay thế thuốc', 'không cần thuốc', 'hiệu quả hơn thuốc'],
+    message: 'Nghiêm cấm gợi ý mỹ phẩm thay thế thuốc điều trị.',
+    suggestion: 'Chỉ mô tả công dụng làm đẹp, không so sánh với thuốc.' },
+  { code: 'COS-003', pack: 'cosmetics_vn', severity: 'warning', name: 'Trước/sau & chứng nhận',
+    keywords: ['trước sau', 'kết quả thực tế', 'chứng minh lâm sàng'],
+    message: 'Hình ảnh/số liệu trước-sau cần có bằng chứng kiểm chứng.',
+    suggestion: 'Thêm: nguồn nghiên cứu, số mẫu thử, điều kiện đo lường.' },
+  { code: 'CORE-003', pack: 'core_ads_vn', severity: 'critical', name: 'Thiếu nhãn quảng cáo',
+    keywords: [],
+    description: 'Bài paid_ad hoặc creator_partnership phải có nhãn "#QuảngCáo" hoặc "Nội dung tài trợ".',
+    message: 'Nội dung có quan hệ thương mại phải công khai minh bạch.',
+    suggestion: 'Thêm #QuảngCáo hoặc "Nội dung được tài trợ bởi [Thương hiệu]".' },
+];
+
+const SEVERITY_CONFIG = {
+  critical: { icon: '●', label: 'Nghiêm trọng (Critical)', cls: 'compliance-rule-critical' },
+  warning:  { icon: '▲', label: 'Cảnh báo (Warning)',  cls: 'compliance-rule-warning'  },
+  info:     { icon: '◆', label: 'Lưu ý (Info)',      cls: 'compliance-rule-info'     },
+};
+
+const PACK_LABELS = {
+  core_ads_vn: 'CORE (Mọi ngành)',
+  cosmetics_vn: 'COSMETICS_VN (Mỹ phẩm)',
+  brand: 'BRAND (Thương hiệu)',
+};
+
 export default function BrandRules() {
   const [activeRuleId, setActiveRuleId] = useState(1);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleDesc, setNewRuleDesc] = useState('');
+  const [activeMainTab, setActiveMainTab] = useState('config'); // 'config' | 'compliance-rules'
 
   // Default rich rule sets matching user's HTML specification
   const [ruleSets, setRuleSets] = useState([
@@ -348,21 +389,16 @@ export default function BrandRules() {
       {/* PAGE HEADER */}
       <section className="page-header">
         <div className="page-header-left">
-          <div className="eyebrow">
-            <span>BRAND RULES &amp; COMPLIANCE GOVERNANCE</span>
-            <span className="eyebrow-sep">&bull;</span>
-            <span className="mono-text">SRS 3.2 &middot; BRD-01..04</span>
-          </div>
-          <h1 className="page-title">Bộ Quy Tắc Thương Hiệu</h1>
+          <h1 className="page-title">Quy Chuẩn Thương Hiệu & Tuân Thủ</h1>
           <p className="page-subtitle">
-            Kiểm soát thuật toán từ cấm, ngữ nghĩa pháp lý Dược phẩm và Tone of Voice đa kênh
+            Hệ thống sàng lọc tuân thủ 3 lớp: Luật quảng cáo cốt lõi, Quy chuẩn Dược mỹ phẩm và Tone of Voice thương hiệu
           </p>
         </div>
 
         <div className="page-header-actions">
           <div className="engine-badge">
             <span className="status-dot dot-green"></span>
-            <span className="mono-text">Neural Guard v4.8: Active</span>
+            <span className="mono-text">Sàng lọc tuân thủ AI: Active</span>
           </div>
           
           <button className="btn btn-secondary" type="button" onClick={handleExportJSON}>
@@ -508,6 +544,25 @@ export default function BrandRules() {
 
         {/* RIGHT MAIN WORKSPACE */}
         <div className="main-content">
+
+          {/* MAIN TAB SWITCHER */}
+          <div className="main-tab-bar">
+            <button
+              className={`main-tab-btn ${activeMainTab === 'config' ? 'main-tab-active' : ''}`}
+              onClick={() => setActiveMainTab('config')}
+            >
+              ⚙️ Cấu hình Brand Rule
+            </button>
+            <button
+              className={`main-tab-btn ${activeMainTab === 'compliance-rules' ? 'main-tab-active' : ''}`}
+              onClick={() => setActiveMainTab('compliance-rules')}
+            >
+              🛡️ Quy tắc tuân thủ
+            </button>
+          </div>
+
+          {/* CONFIG TAB */}
+          {activeMainTab === 'config' && (<>
 
           {/* RULE CONFIGURATION PANEL */}
           <section className="panel config-panel">
@@ -886,6 +941,64 @@ export default function BrandRules() {
               </div>
             </div>
           </section>
+
+          </>)}
+
+          {/* COMPLIANCE RULES TAB */}
+          {activeMainTab === 'compliance-rules' && (
+            <section className="panel compliance-rules-panel">
+              <div className="panel-header">
+                <div className="panel-title-group">
+                  <svg className="icon-brand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <h2 className="panel-title-sm">QUY TẮC TUÂN THỦ 3 LỚP — COMPLIANCE ENGINE</h2>
+                </div>
+                <span className="badge badge-neutral">{COMPLIANCE_RULES.length} quy tắc</span>
+              </div>
+
+              {/* Group by pack */}
+              {Object.entries(
+                COMPLIANCE_RULES.reduce((acc, r) => {
+                  (acc[r.pack] = acc[r.pack] || []).push(r);
+                  return acc;
+                }, {})
+              ).map(([pack, rules]) => (
+                <div key={pack} className="compliance-pack-group">
+                  <div className="compliance-pack-header">
+                    <span className="compliance-pack-label">{PACK_LABELS[pack] || pack}</span>
+                    <span className="badge badge-neutral mono-text">{rules.length} quy tắc</span>
+                  </div>
+                  <div className="compliance-rules-table">
+                    {rules.map(rule => {
+                      const sev = SEVERITY_CONFIG[rule.severity] || SEVERITY_CONFIG.info;
+                      return (
+                        <div key={rule.code} className={`compliance-rule-row ${sev.cls}`}>
+                          <div className="compliance-rule-top">
+                            <span className="compliance-severity-badge">
+                              {sev.icon} <span className="mono-text">{sev.label}</span>
+                            </span>
+                            <span className="compliance-rule-code mono-text">{rule.code}</span>
+                            <span className="compliance-rule-name">{rule.name}</span>
+                          </div>
+                          <p className="compliance-rule-message">{rule.message}</p>
+                          {rule.keywords && rule.keywords.length > 0 && (
+                            <div className="compliance-keywords">
+                              <span className="compliance-kw-label">Từ khóa trigger:</span>
+                              {rule.keywords.map(kw => (
+                                <span key={kw} className="compliance-kw-chip">{kw}</span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="compliance-rule-suggestion">💡 {rule.suggestion}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
 
         </div>
       </div>
