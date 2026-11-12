@@ -2,7 +2,7 @@
  * API Service đồng bộ dữ liệu thời gian thực giữa React Frontend và Database (PostgreSQL / SQLite).
  */
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export async function fetchHealth() {
   try {
@@ -48,6 +48,20 @@ export async function deleteCampaignApi(campaignId) {
     return await res.json();
   } catch (err) {
     console.error('API delete campaign error:', err);
+    return null;
+  }
+}
+
+export async function updateCampaignApi(campaignId, campaignData) {
+  try {
+    const res = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(campaignData)
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('API update campaign error:', err);
     return null;
   }
 }
@@ -188,6 +202,65 @@ export async function loginApi(username, password) {
     throw new Error(errData.detail || 'Đăng nhập không thành công');
   }
   return await res.json();
+}
+
+export async function runComplianceCheckApi(postId) {
+  try {
+    const res = await fetch(`${API_BASE}/posts/${postId}/compliance-check`, { method: 'POST' });
+    return await res.json();
+  } catch (err) { return null; }
+}
+
+export async function fetchPerformanceApi(campaignId) {
+  try {
+    const res = await fetch(`${API_BASE}/campaigns/${campaignId}/performance`);
+    return res.ok ? await res.json() : null;
+  } catch (err) { return null; }
+}
+
+export async function submitPerformanceApi(campaignId, data) {
+  try {
+    const res = await fetch(`${API_BASE}/campaigns/${campaignId}/performance`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+    });
+    return await res.json();
+  } catch (err) { return null; }
+}
+
+export async function fetchProductsApi() {
+  try {
+    const res = await fetch(`${API_BASE}/products`);
+    return res.ok ? await res.json() : [];
+  } catch (err) { return []; }
+}
+
+export async function fetchProductClaimsApi(productId) {
+  try {
+    const res = await fetch(`${API_BASE}/products/${productId}/claims`);
+    return res.ok ? await res.json() : [];
+  } catch (err) { return []; }
+}
+
+export async function createClaimApi(productId, data) {
+  try {
+    const res = await fetch(`${API_BASE}/products/${productId}/claims`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return await res.json();
+  } catch (err) { return null; }
+}
+
+export async function approveClaimApi(claimId, approvedBy = "Legal Reviewer") {
+  try {
+    const res = await fetch(`${API_BASE}/claims/${claimId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved_by: approvedBy })
+    });
+    return await res.json();
+  } catch (err) { return null; }
 }
 
 
