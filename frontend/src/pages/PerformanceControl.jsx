@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { submitPerformanceApi } from '../api';
 import {
   TrendingUp,
   Plus,
@@ -116,11 +117,7 @@ function MetricsInputTab({ campaigns }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch(`/api/campaigns/${form.campaign_id}/performance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      });
+      await submitPerformanceApi(form.campaign_id, form);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { callAiJobApi } from '../api';
 import {
   BarChart2,
   Plus,
@@ -21,16 +22,7 @@ import {
 
 // ── Helper: call AI job ─────────────────────────────────────────
 async function callAiJob(agent, payload) {
-  try {
-    const res = await fetch('/api/ai-jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent, ...payload })
-    });
-    return res.ok ? await res.json() : null;
-  } catch {
-    return null;
-  }
+  return await callAiJobApi(agent, payload);
 }
 
 // ── SWOT Tab ─────────────────────────────────────────────────────
