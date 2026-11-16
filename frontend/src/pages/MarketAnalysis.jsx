@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { callAiJobApi } from '../api';
+import React, { useState, useEffect } from 'react';
+import { callAiJobApi, fetchMarketAnalysisApi, saveMarketAnalysisApi } from '../api';
 import {
   BarChart2,
   Plus,
@@ -26,16 +26,35 @@ async function callAiJob(agent, payload) {
 }
 
 // ── SWOT Tab ─────────────────────────────────────────────────────
-function SwotTab() {
+function SwotTab({ currentCampaign }) {
   const [swot, setSwot] = useState({
-    strengths: 'Công thức độc quyền Niacinamide 10% + Panthenol B5 5% phục hồi màng ẩm sinh học; giá thành cạnh tranh ($15,000 ngân sách).',
-    weaknesses: 'Nhận diện thương hiệu mới, chưa có kênh phân phối trực tiếp chuỗi Guardian/Watsons.',
-    opportunities: 'Xu hướng Skintellectual bùng nổ trên TikTok Shop; nhu cầu phục hồi da mụn nhạy cảm tăng cao.',
-    threats: 'Cạnh tranh gay gắt từ hàng xách tay; siết chặt quy định quảng cáo Dược Mỹ phẩm VN 2026.'
+    strengths: '',
+    weaknesses: '',
+    opportunities: '',
+    threats: ''
   });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (currentCampaign?.id) {
+      fetchMarketAnalysisApi(currentCampaign.id).then(data => {
+        if (data && data.swot) {
+          setSwot(data.swot);
+          if (data.output) setAiResult(data.output);
+        } else if (!swot.strengths) {
+          // Default initial example
+          setSwot({
+            strengths: 'Công nghệ tiên tiến, thiết kế vượt trội, bảo hành VIP',
+            weaknesses: 'Thương hiệu mới thâm nhập, giá định vị cao',
+            opportunities: 'Nhu cầu thị trường tăng trưởng mạnh trong phân khúc cao cấp',
+            threats: 'Cạnh tranh trực diện với các thương hiệu đã có thị phần lâu năm'
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [currentCampaign?.id]);
 
   const cells = [
     { key: 'strengths', label: 'Điểm mạnh (Strengths)', icon: <Zap className="w-4 h-4 text-emerald-600" />, badge: 'Nội tại', border: 'border-slate-200 focus-within:border-emerald-500' },
@@ -47,8 +66,16 @@ function SwotTab() {
   const handleAiAnalyze = async () => {
     setAiLoading(true);
     setAiResult(null);
-    const result = await callAiJob('market_intel', { type: 'swot', data: swot });
-    setAiResult(result ? (result.output || result.message || 'Phân tích hoàn tất.') : 'Không thể kết nối AI.');
+    const result = await callAiJob('market_intel', { 
+      type: 'swot', 
+      campaign_id: currentCampaign?.id || 1,
+      data: swot 
+    });
+    const output = result ? (result.output || result.message || 'Phân tích hoàn tất.') : 'Không thể kết nối AI.';
+    setAiResult(output);
+    if (currentCampaign?.id && result) {
+      saveMarketAnalysisApi(currentCampaign.id, { swot, output }).catch(() => {});
+    }
     setAiLoading(false);
   };
 
@@ -426,7 +453,7 @@ const TABS = [
   { id: 'stp', label: 'Chiến lược STP & Persona' },
 ];
 
-export default function MarketAnalysis() {
+export default function MarketAnalysis({ currentCampaign }) {
   const [activeTab, setActiveTab] = useState('swot');
 
   return (
@@ -458,7 +485,7 @@ export default function MarketAnalysis() {
 
       {/* Tab content */}
       <div>
-        {activeTab === 'swot' && <SwotTab />}
+        {activeTab === 'swot' && <SwotTab currentCampaign={currentCampaign} />}
         {activeTab === 'competitor' && <CompetitorTab />}
         {activeTab === 'stp' && <StpTab />}
       </div>

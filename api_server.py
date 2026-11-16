@@ -991,11 +991,13 @@ def create_ai_job_endpoint(req: AiJobRequest):
         if req.agent == "market_intel":
             req_type = req.type or "swot"
             if req_type == "swot":
-                # Phân tích động chính xác theo 100% dữ liệu người dùng nhập
+                # Phân tích định lượng chuyên sâu theo 100% dữ liệu người dùng nhập
+                camp = crud.get_campaign_by_id(conn, camp_id) or {}
+                budget_str = str(camp.get("budget") or "")
                 if isinstance(req_data, dict) and any(str(v).strip() for v in req_data.values()):
-                    output_data = analyze_swot(req_data)
+                    output_data = analyze_swot(req_data, budget_str=budget_str)
                 else:
-                    output_data = analyze_swot({})
+                    output_data = analyze_swot({}, budget_str=budget_str)
             elif req_type == "competitor":
                 comps = req_data if isinstance(req_data, list) else []
                 output_data = analyze_competitors(comps)
@@ -1007,11 +1009,22 @@ def create_ai_job_endpoint(req: AiJobRequest):
             else:
                 output_data = f"Đã hoàn thành phân tích {req_type} cho chiến dịch."
         elif req.agent == "brief_architect":
+            camp = crud.get_campaign_by_id(conn, camp_id) or {}
+            p_name = camp.get("product_name") or camp.get("name") or "Sản phẩm chiến dịch"
+            p_target = camp.get("target_audience") or "Khách hàng tiềm năng mục tiêu"
+            p_chan = camp.get("channels") or "TikTok, Instagram, Facebook"
+            p_voice = camp.get("brand_voice") or "Sáng tạo, Chuyên nghiệp"
             output_data = (
-                "📋 [Agent 02 - Brief Architect] Creative Brief Tự động:\n"
-                "• Mục tiêu: Thúc đẩy nhận diện và chuyển đổi 1.500 đơn hàng đầu tiên trong tuần lễ ra mắt.\n"
-                "• Thông điệp cốt lõi: 'Đánh thức làn da căng bóng chuẩn thủy tinh chỉ sau 14 ngày'.\n"
-                "• Kênh phân phối: TikTok (Hook 7s), Instagram (Carousel 4 bước), Facebook (Feedback chuyên gia)."
+                f"📋 [Agent 02 - Brief Architect] Creative Brief Tự Động Hóa Cho: {p_name}\n"
+                f"{'='*65}\n"
+                f"• Định vị chiến dịch: {camp.get('name', 'Chiến dịch trọng điểm')}\n"
+                f"• Phân khúc khách hàng mục tiêu: {p_target}\n"
+                f"• Kênh truyền thông phân phối: {p_chan}\n"
+                f"• Giọng văn thương hiệu (Brand Voice): {p_voice}\n"
+                f"• Ma trận trụ cột nội dung đề xuất (Content Pillars):\n"
+                f"  1. Hero Hook (Nhận diện & Gây sốc thông số): Video ngắn tập trung trực diện vào tính năng nổi bật nhất.\n"
+                f"  2. Social Proof & Blind Test: Đánh giá thực nghiệm khách quan từ chuyên gia & Reviewer.\n"
+                f"  3. Conversion & Urgency: Thúc đẩy hành động mua ngay với đặc quyền bảo hành và tài chính linh hoạt."
             )
         else:
             output_data = "Tác vụ AI hoàn thành thành công."

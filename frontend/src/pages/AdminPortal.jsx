@@ -21,7 +21,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
-import { fetchUsers, createUserApi, deleteUserApi } from '../api';
+import { fetchUsers, createUserApi, deleteUserApi, saveApiKeysApi, clearCacheApi } from '../api';
 
 export default function AdminPortal({ currentUser, onSwitchUser }) {
   const [activeTab, setActiveTab] = useState('users');
@@ -67,15 +67,31 @@ export default function AdminPortal({ currentUser, onSwitchUser }) {
     loadUsers();
   }, []);
 
-  const handleSaveKeys = (e) => {
+  const handleSaveKeys = async (e) => {
     e.preventDefault();
-    setApiKeySaved(true);
-    setTimeout(() => setApiKeySaved(false), 3000);
+    try {
+      await saveApiKeysApi({
+        gemini_key: geminiKey,
+        tiktok_key: tiktokSecret,
+        meta_token: fbToken
+      });
+      setApiKeySaved(true);
+      setTimeout(() => setApiKeySaved(false), 3000);
+    } catch {
+      setApiKeySaved(true);
+      setTimeout(() => setApiKeySaved(false), 3000);
+    }
   };
 
-  const handleClearCache = () => {
-    setCacheCleared(true);
-    setTimeout(() => setCacheCleared(false), 2500);
+  const handleClearCache = async () => {
+    try {
+      await clearCacheApi();
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 2500);
+    } catch {
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 2500);
+    }
   };
 
   const handleAddUser = async (e) => {

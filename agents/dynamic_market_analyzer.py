@@ -4,65 +4,16 @@ Phân tích trực tiếp và sâu sắc mọi dữ liệu đầu vào người 
 Không bao giờ dùng dữ liệu tĩnh cứng nhắc; phân tích phản chiếu 100% đúng ngành hàng và thông số người dùng cung cấp.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+from agents.quantitative_engine import QuantitativeMarketingEngine
 
 
-def analyze_swot(data: Dict[str, Any]) -> str:
-    """Phân tích ma trận SWOT kết hợp TOWS (SO, WO, ST, WT) dựa trên dữ liệu người dùng nhập."""
+def analyze_swot(data: Dict[str, Any], budget_str: str = "", target_orders: Optional[int] = None) -> str:
+    """Phân tích ma trận SWOT kết hợp mô hình kinh tế định lượng và phễu chuyển đổi."""
     if not isinstance(data, dict):
         data = {}
+    return QuantitativeMarketingEngine.analyze_swot_quantitative(data, budget_str=budget_str, target_orders=target_orders)
 
-    strengths = str(data.get("strengths", "")).strip() or "Chưa có thông tin điểm mạnh."
-    weaknesses = str(data.get("weaknesses", "")).strip() or "Chưa có thông tin điểm yếu."
-    opportunities = str(data.get("opportunities", "")).strip() or "Chưa có thông tin cơ hội."
-    threats = str(data.get("threats", "")).strip() or "Chưa có thông tin thách thức."
-
-    # Lấy ý chính ngắn gọn cho ma trận
-    def get_summary(text: str, limit: int = 70) -> str:
-        first_clause = text.split(",")[0].split(";")[0].split(".")[0].strip()
-        if len(first_clause) > limit:
-            return first_clause[:limit] + "..."
-        return first_clause or text[:limit]
-
-    s_lead = get_summary(strengths)
-    w_lead = get_summary(weaknesses)
-    o_lead = get_summary(opportunities)
-    t_lead = get_summary(threats)
-
-    report = (
-        "📊 [Agent 01 - Market Intel] Báo cáo Phân tích Chiến lược SWOT Tùy biến Cao cấp:\n\n"
-        "1. ĐÁNH GIÁ YẾU TỐ ĐẦU VÀO TỪ DOANH NGHIỆP:\n"
-        f"• STRENGTHS (Điểm mạnh cốt lõi):\n"
-        f"  - Nhập liệu: \"{strengths}\"\n"
-        f"  ↳ Nhận định: Lợi thế kỹ thuật/sản phẩm rất rõ rệt ({s_lead}), cần biến thành thông điệp truyền thông đinh (Hero Feature) để dẫn dắt phân khúc.\n\n"
-        f"• WEAKNESSES (Điểm yếu & Rào cản):\n"
-        f"  - Nhập liệu: \"{weaknesses}\"\n"
-        f"  ↳ Nhận định: Điểm nghẽn tiếp cận thị trường ({w_lead}), đòi hỏi chính sách tài chính linh hoạt hoặc cam kết hậu mãi để giảm ma sát tâm lý.\n\n"
-        f"• OPPORTUNITIES (Thời cơ thị trường):\n"
-        f"  - Nhập liệu: \"{opportunities}\"\n"
-        f"  ↳ Nhận định: Động lực thị trường đang mở rộng ({o_lead}), sẵn sàng đón nhận những thương hiệu có sự đột phá.\n\n"
-        f"• THREATS (Thách thức & Áp lực cạnh tranh):\n"
-        f"  - Nhập liệu: \"{threats}\"\n"
-        f"  ↳ Nhận định: Áp lực cạnh tranh ({t_lead}) yêu cầu chiến lược định vị tập trung, tránh đối đầu trực diện về giá.\n\n"
-        "2. MA TRẬN PHỐI HỢP CHIẾN LƯỢC (TOWS Strategy Matrix):\n"
-        f"• CHIẾN LƯỢC S-O (Maxi - Maxi | Tấn công dẫn đầu):\n"
-        f"  - Đòn bẩy tối đa: Khai thác ưu thế \"{s_lead}\" để đánh chiếm làn sóng \"{o_lead}\".\n"
-        f"  - Thực thi: Xây dựng chiến dịch Content 'Blind Test' hoặc trải nghiệm độc quyền cùng chuyên gia/KOL đầu ngành, chứng minh sự vượt trội không thể thay thế.\n\n"
-        f"• CHIẾN LƯỢC W-O (Mini - Maxi | Chuyển hóa rào cản):\n"
-        f"  - Hóa giải rào cản \"{w_lead}\" trong bối cảnh \"{o_lead}\".\n"
-        f"  - Thực thi: Áp dụng các giải pháp kích cầu: Chương trình thanh toán linh hoạt (trả góp 0%), chính sách thu cũ trợ giá (Trade-in), hoặc combo quà tặng đặc quyền giới hạn nhằm hạ thấp ngưỡng quyết định mua ban đầu.\n\n"
-        f"• CHIẾN LƯỢC S-T (Maxi - Mini | Khác biệt hóa phòng thủ):\n"
-        f"  - Dùng sức mạnh \"{s_lead}\" để tạo lá chắn vững chắc trước sức ép \"{t_lead}\".\n"
-        f"  - Thực thi: Tuyệt đối không tham gia cuộc chiến giảm giá làm hạ thấp định vị; tập trung khắc sâu trải nghiệm độc quyền độc bản mà đối thủ không thể sao chép.\n\n"
-        f"• CHIẾN LƯỢC W-T (Mini - Mini | Kiểm soát rủi ro & Bảo chứng):\n"
-        f"  - Phòng ngừa tác động tiêu cực của \"{w_lead}\" trước sự đe dọa của \"{t_lead}\".\n"
-        f"  - Thực thi: Cung cấp chính sách bảo hành VIP đặc quyền (1 đổi 1 tận nơi, dịch vụ hỗ trợ kỹ thuật ưu tiên 24/7) để chứng minh giá trị tương xứng từng đồng cho người sở hữu.\n\n"
-        "3. ĐỀ XUẤT HÀNH ĐỘNG CỤ THỂ CHO CHIẾN DỊCH:\n"
-        f"• Thông điệp chủ đạo (Key Hook): Tôn vinh trải nghiệm đột phá dựa trên {s_lead}.\n"
-        f"• Kênh truyền thông ưu tiên: Video chuyên sâu (Tech/Product Reviewers), trải nghiệm thực tế (Showroom/Pop-up Store) và kênh phân phối chọn lọc.\n"
-        f"• Tỷ lệ phân bổ ngân sách: 40% Trải nghiệm & Review thực tế | 35% Kích cầu & Hỗ trợ tài chính | 25% Hậu mãi & Chăm sóc khách hàng VIP."
-    )
-    return report
 
 
 def analyze_competitors(competitors: List[Dict[str, Any]]) -> str:

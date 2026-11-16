@@ -550,7 +550,7 @@ export default function App() {
       <main className="flex-1 p-4 lg:p-5 max-w-[1700px] w-full mx-auto">
         
         {activeNav === 'Market Analysis' && (
-          <MarketAnalysis />
+          <MarketAnalysis currentCampaign={currentCampaign} />
         )}
 
         {activeNav === 'AI Pipeline' && (

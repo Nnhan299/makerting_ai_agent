@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { submitPerformanceApi } from '../api';
+import React, { useState, useEffect } from 'react';
+import { submitPerformanceApi, fetchPartnersApi, createPartnerApi } from '../api';
 import {
   TrendingUp,
   Plus,
@@ -236,8 +236,52 @@ function PartnerTab() {
   const [showModal, setShowModal] = useState(false);
   const [newPartner, setNewPartner] = useState({ ...EMPTY_PARTNER });
 
-  const handleAdd = () => {
-    setPartners(prev => [...prev, { ...newPartner, id: Date.now() }]);
+  useEffect(() => {
+    fetchPartnersApi().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setPartners(data.map(p => ({
+          id: p.id,
+          name: p.name,
+          type: (p.partner_type || 'KOL').toUpperCase(),
+          platform: p.platform || 'TikTok',
+          followers: p.followers ? `${p.followers}` : '—',
+          fee_per_post: p.fee_per_post ? Number(p.fee_per_post).toLocaleString('vi-VN') : '—',
+          status: p.status || 'Active',
+          rating: p.rating || 4
+        })));
+      }
+    }).catch(err => console.warn('Fetch partners fallback:', err));
+  }, []);
+
+  const handleAdd = async () => {
+    try {
+      await createPartnerApi({
+        name: newPartner.name,
+        partner_type: newPartner.type.toLowerCase(),
+        platform: newPartner.platform,
+        followers: parseInt(newPartner.followers.replace(/[^0-9]/g, '')) || 0,
+        fee_per_post: parseFloat(newPartner.fee_per_post.replace(/[^0-9.]/g, '')) || 0,
+        status: newPartner.status,
+        rating: newPartner.rating
+      });
+      const data = await fetchPartnersApi();
+      if (Array.isArray(data) && data.length > 0) {
+        setPartners(data.map(p => ({
+          id: p.id,
+          name: p.name,
+          type: (p.partner_type || 'KOL').toUpperCase(),
+          platform: p.platform || 'TikTok',
+          followers: p.followers ? `${p.followers}` : '—',
+          fee_per_post: p.fee_per_post ? Number(p.fee_per_post).toLocaleString('vi-VN') : '—',
+          status: p.status || 'Active',
+          rating: p.rating || 4
+        })));
+      } else {
+        setPartners(prev => [...prev, { ...newPartner, id: Date.now() }]);
+      }
+    } catch {
+      setPartners(prev => [...prev, { ...newPartner, id: Date.now() }]);
+    }
     setNewPartner({ ...EMPTY_PARTNER });
     setShowModal(false);
   };

@@ -25,7 +25,7 @@ import {
   Users
 } from 'lucide-react';
 
-import { updatePostApi } from '../api';
+import { updatePostApi, runCampaignPipelineApi, fetchPosts } from '../api';
 
 // ── Local 3-layer compliance check (no API call needed for demo) ──
 function runLocalComplianceCheck(content, postKind, disclosureLabel) {
@@ -138,18 +138,41 @@ export default function StudioCanvas({ currentCampaign, onApprovePost, isApprove
     }
   };
 
-  // Run Agent Suite Simulation
-  const handleRunPipeline = () => {
+  // Run Agent Suite Real Pipeline via Backend API
+  const handleRunPipeline = async () => {
     setIsRunningPipeline(true);
     setPipelineStep(1);
-    setTimeout(() => setPipelineStep(2), 1200);
-    setTimeout(() => setPipelineStep(3), 2400);
-    setTimeout(() => {
-      setIsRunningPipeline(false);
-      setPipelineStep(0);
-      setHasAppliedFix(false);
-      setIsApproved(false);
-    }, 3600);
+    try {
+      setPipelineStep(2);
+      const campId = currentCampaign?.id || 1;
+      const res = await runCampaignPipelineApi(campId);
+      setPipelineStep(3);
+      if (res && res.status === 'completed') {
+        const posts = await fetchPosts(campId);
+        if (posts && posts.length > 0) {
+          const firstPost = posts[0];
+          const lines = (firstPost.content || '').split('\n').filter(Boolean);
+          setPostContent({
+            title: firstPost.title || 'Bài viết tối ưu từ Agent 02',
+            hook: lines[0] || 'Thông điệp tối ưu chuyển đổi từ AI',
+            body: lines.slice(1, -1).join(' ') || (firstPost.content || ''),
+            forbiddenPart: '',
+            safePart: '',
+            tail: '',
+            hashtags: ['#MarketingAI', '#Campaign2026', '#Flagship']
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Pipeline run error:', err);
+    } finally {
+      setTimeout(() => {
+        setIsRunningPipeline(false);
+        setPipelineStep(0);
+        setHasAppliedFix(false);
+        setIsApproved(false);
+      }, 1000);
+    }
   };
 
   return (
