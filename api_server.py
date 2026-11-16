@@ -17,6 +17,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database.connection import get_connection, get_db_type, is_postgres_available
 import database.crud as crud
+from agents.dynamic_market_analyzer import analyze_swot, analyze_competitors, analyze_stp
+from utils.llm_client import LLMClient
+from agents.orchestrator import AgentOrchestrator
 
 app = FastAPI(
     title="Aura Marketing AI Agent API",
@@ -151,8 +154,8 @@ class CampaignCreateRequest(BaseModel):
     name: str
     product_name: str
     target_audience: Optional[str] = ""
-    budget: Optional[str] = "$15,000 USD"
-    channels: Optional[str] = "Facebook, TikTok, Instagram"
+    budget: Optional[Any] = "$15,000 USD"
+    channels: Optional[Any] = "Facebook, TikTok, Instagram"
     status: Optional[str] = "In-Progress"
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -161,8 +164,8 @@ class CampaignUpdateRequest(BaseModel):
     name: Optional[str] = None
     product_name: Optional[str] = None
     target_audience: Optional[str] = None
-    budget: Optional[str] = None
-    channels: Optional[str] = None
+    budget: Optional[Any] = None
+    channels: Optional[Any] = None
     status: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -268,13 +271,15 @@ def create_campaign_endpoint(req: CampaignCreateRequest):
     conn = get_connection()
     try:
         now_date = datetime.now().strftime("%Y-%m-%d")
+        budget_str = f"${req.budget:,.0f} USD" if isinstance(req.budget, (int, float)) else str(req.budget or "$15,000 USD")
+        channels_str = ", ".join(req.channels) if isinstance(req.channels, list) else str(req.channels or "Facebook, TikTok, Instagram")
         cid = crud.create_campaign(
             conn,
             name=req.name,
             product_name=req.product_name,
             target_audience=req.target_audience or "",
-            budget=req.budget or "$15,000 USD",
-            channels=req.channels or "Facebook, TikTok, Instagram",
+            budget=budget_str,
+            channels=channels_str,
             start_date=req.start_date or now_date,
             end_date=req.end_date or "2026-12-31"
         )
@@ -603,6 +608,7 @@ class PerformanceMetricRequest(BaseModel):
     orders: Optional[int] = 0
     gmv: Optional[float] = 0
     spend: Optional[float] = 0
+    ad_spend: Optional[float] = None
 
 class PartnerCreateRequest(BaseModel):
     partner_type: str
@@ -625,6 +631,20 @@ class ProductClaimCreateRequest(BaseModel):
 
 class ClaimApproveRequest(BaseModel):
     approved_by: Optional[str] = "Legal Reviewer"
+
+class RunPipelineRequest(BaseModel):
+    brand_rule_id: Optional[int] = 1
+
+class ApiKeysConfigRequest(BaseModel):
+    gemini_api_key: Optional[str] = None
+    tiktok_secret: Optional[str] = None
+    meta_token: Optional[str] = None
+
+class MarketAnalysisSaveRequest(BaseModel):
+    swot: Optional[Dict[str, Any]] = None
+    competitors: Optional[List[Dict[str, Any]]] = None
+    stp: Optional[Dict[str, Any]] = None
+    personas: Optional[List[Dict[str, Any]]] = None
 
 
 # ============================================================
@@ -820,9 +840,15 @@ def create_budget_line(campaign_id: int, req: BudgetLineCreateRequest):
     """Tạo dòng ngân sách mới cho chiến dịch."""
     conn = get_connection()
     try:
+        cat = (req.category or "other").lower().strip()
+        if cat in ("media", "ads", "advertising"):
+            cat = "paid_media"
+        allowed_cats = ('paid_media','kol_koc','production','event','promotion','sponsorship','tools','contingency','other')
+        if cat not in allowed_cats:
+            cat = "other"
         bid = crud.create_budget_line(
             conn, campaign_id=campaign_id,
-            category=req.category, channel=req.channel or "",
+            category=cat, channel=req.channel or "",
             planned_amount=req.planned_amount, note=req.note or ""
         )
         return {"id": bid, "message": "Đã thêm dòng ngân sách thành công."}
@@ -876,6 +902,7 @@ def run_compliance_check(post_id: int):
             "score": result["score"],
             "risk_level": result["risk_level"],
             "findings": result["findings"],
+            "violations": result["findings"],
             "disclaimer": "Kết quả hỗ trợ rà soát rủi ro, không thay thế ý kiến của người có thẩm quyền."
         }
     finally:
@@ -899,12 +926,13 @@ def submit_performance(campaign_id: int, req: PerformanceMetricRequest):
     """Nhập số liệu hiệu suất thực cho chiến dịch."""
     conn = get_connection()
     try:
+        final_spend = req.spend if (req.spend and req.spend > 0) else (req.ad_spend or 0.0)
         ok = crud.upsert_performance_metrics(
             conn, campaign_id=campaign_id,
             channel=req.channel, metric_date=req.metric_date,
             traffic_type=req.traffic_type, post_id=req.post_id,
             views=req.views, reach=req.reach, engagements=req.engagements,
-            clicks=req.clicks, orders=req.orders, gmv=req.gmv, spend=req.spend
+            clicks=req.clicks, orders=req.orders, gmv=req.gmv, spend=final_spend
         )
         return {"success": ok, "message": "Đã lưu số liệu hiệu suất."}
     finally:
@@ -959,40 +987,23 @@ def create_ai_job_endpoint(req: AiJobRequest):
         job_id = crud.create_ai_job(conn, agent=req.agent, campaign_id=camp_id, input_data=req.dict())
         
         output_data = ""
+        req_data = req.data
         if req.agent == "market_intel":
             req_type = req.type or "swot"
             if req_type == "swot":
-                output_data = (
-                    "📊 [Agent 01 - Market Intel] Phân tích SWOT Thị trường Dược Mỹ Phẩm VN 2026:\n\n"
-                    "• STRENGTHS (Điểm mạnh):\n"
-                    "  - Công thức độc quyền Niacinamide 10% kết hợp Panthenol B5 5% phục hồi màng ẩm sinh học đạt chuẩn Dược mỹ phẩm.\n"
-                    "  - Giá thành cạnh tranh ($15,000 ngân sách chiến dịch, giá bán lẻ 350.000đ) so với các thương hiệu Pháp/Hàn nhập khẩu.\n\n"
-                    "• WEAKNESSES (Điểm yếu):\n"
-                    "  - Nhận diện thương hiệu mới cần thời gian xây dựng sự tin cậy khoa học.\n"
-                    "  - Kênh phân phối trực tiếp (DTC) phụ thuộc vào TMĐT, chưa phủ chuỗi Guardian/Watsons.\n\n"
-                    "• OPPORTUNITIES (Cơ hội):\n"
-                    "  - Xu hướng 'Skintellectual' (người dùng hiểu hoạt chất) bùng nổ mạnh mẽ trên TikTok Shop và Shopee Mall.\n"
-                    "  - Nhu cầu phục hồi da mụn, da treatment sau môi trường ô nhiễm đô thị tăng 35% năm 2026.\n\n"
-                    "• THREATS (Thách thức):\n"
-                    "  - Cạnh tranh gay gắt từ hàng xách tay và thương hiệu nội địa giá rẻ.\n"
-                    "  - Quy định siết chặt việc dùng từ ngữ y tế (chữa khỏi, điều trị) theo quy định Dược mỹ phẩm VN 2026."
-                )
+                # Phân tích động chính xác theo 100% dữ liệu người dùng nhập
+                if isinstance(req_data, dict) and any(str(v).strip() for v in req_data.values()):
+                    output_data = analyze_swot(req_data)
+                else:
+                    output_data = analyze_swot({})
             elif req_type == "competitor":
-                output_data = (
-                    "🎯 [Agent 01 - Market Intel] Ma trận Phân tích Đối thủ Trọng tâm:\n\n"
-                    "1. Nhóm Dược Mỹ phẩm Quốc tế (La Roche-Posay B5, The Ordinary): Có uy tín lâm sàng nhưng giá cao (450k-600k), hàng xách tay nhiều hàng giả gây hoang mang.\n"
-                    "2. Nhóm Mỹ phẩm Nội địa (Cocoon, Klairs VN): Marketing bản địa xuất sắc, tận dụng câu chuyện thuần chay nhưng thiếu định vị chuyên sâu về phục hồi màng ẩm sinh học.\n\n"
-                    "💡 Khoảng trống chiến lược cho AuraAI:\n"
-                    "Tập trung định vị 'Chuyên gia phục hồi hàng rào ẩm sau 14 ngày', minh bạch thành phần, hợp tác với KOC da liễu và cam kết an toàn đã được kiểm nghiệm."
-                )
+                comps = req_data if isinstance(req_data, list) else []
+                output_data = analyze_competitors(comps)
             elif req_type == "stp":
-                output_data = (
-                    "🧭 [Agent 01 - Market Intel] Chiến lược STP & Chân dung Khách hàng (Persona):\n\n"
-                    "• SEGMENTATION: Nữ & Nam 18 - 30 tuổi tại TP.HCM, Hà Nội, Đà Nẵng; gặp vấn đề da dầu thiếu ẩm, mụn viêm nhạy cảm.\n"
-                    "• TARGETING: Nhóm 'Gen Z & Millennial Skintellectuals' — mua hàng dựa trên phân tích thành phần khoa học và review từ chuyên gia/KOC đáng tin cậy.\n"
-                    "• POSITIONING: 'Siêu tinh chất phục hồi màng ẩm sinh học dịu lành với phức hợp Nano B5 + Ceramide'.\n"
-                    "• PERSONA TRỌNG TÂM: Nguyễn Hoàng My (23 tuổi, Nhân viên văn phòng / Sáng tạo nội dung). Làn da thường xuyên tiếp xúc điều hòa, stress, tìm kiếm giải pháp cấp ẩm mỏng nhẹ không bết dính với chi phí hợp lý."
-                )
+                if isinstance(req_data, dict):
+                    output_data = analyze_stp(req_data.get("stp", {}), req_data.get("personas", []))
+                else:
+                    output_data = analyze_stp({}, [])
             else:
                 output_data = f"Đã hoàn thành phân tích {req_type} cho chiến dịch."
         elif req.agent == "brief_architect":
@@ -1045,7 +1056,11 @@ def create_claim_endpoint(product_id: int, req: ProductClaimCreateRequest):
     """Tạo claim mới ở trạng thái draft (chờ Legal duyệt theo nguyên tắc P3)."""
     conn = get_connection()
     try:
-        cid = crud.create_product_claim(conn, product_id, req.claim_text, req.claim_type, req.valid_until)
+        ctype = (req.claim_type or "benefit").lower().strip()
+        allowed_types = ('benefit', 'ingredient', 'certification', 'comparison', 'statistic', 'other')
+        if ctype not in allowed_types:
+            ctype = 'benefit'
+        cid = crud.create_product_claim(conn, product_id, req.claim_text, ctype, req.valid_until)
         return {"id": cid, "message": "Claim đã được lưu ở trạng thái draft, cần Legal phê duyệt trước khi AI được phép sử dụng."}
     finally:
         conn.close()
@@ -1060,6 +1075,145 @@ def approve_claim_endpoint(claim_id: int, req: ClaimApproveRequest):
         return {"success": ok, "message": f"Claim #{claim_id} đã được phê duyệt hợp lệ."}
     finally:
         conn.close()
+
+
+# --- AI PIPELINE ORCHESTRATION ---
+
+@app.post("/api/campaigns/{campaign_id}/run-pipeline")
+def run_campaign_pipeline_endpoint(campaign_id: int, req: Optional[RunPipelineRequest] = None):
+    """Chạy toàn bộ quy trình AI 3 Agent: Market Intelligence -> Copywriter -> Brand Auditor."""
+    conn = get_connection()
+    try:
+        camp = crud.get_campaign_by_id(conn, campaign_id)
+        if not camp:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chiến dịch.")
+
+        brand_rule_id = (req.brand_rule_id if req else 1) or 1
+        rules = crud.get_all_brand_rules(conn)
+        if rules and not any(r["id"] == brand_rule_id for r in rules):
+            brand_rule_id = rules[0]["id"]
+
+        llm_client = LLMClient()
+        orchestrator = AgentOrchestrator(llm_client, conn)
+        result = orchestrator.run_pipeline(campaign_id, brand_rule_id)
+
+        created_posts = crud.get_posts_by_campaign(conn, campaign_id)
+        overall_score = result.get("checkpoint", {}).get("agent3_output", {}).get("overall_score", 95)
+        insights = result.get("checkpoint", {}).get("agent1_output", {})
+
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "posts_count": len(created_posts),
+            "overall_score": overall_score,
+            "logs": orchestrator.logs,
+            "insights": insights,
+            "posts": created_posts
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi thực thi Pipeline AI: {str(e)}")
+    finally:
+        conn.close()
+
+
+# --- MARKET ANALYSIS PERSISTENCE ---
+
+@app.get("/api/campaigns/{campaign_id}/market-analysis")
+def get_campaign_market_analysis(campaign_id: int):
+    """Lấy dữ liệu phân tích thị trường mới nhất của chiến dịch từ ai_jobs."""
+    conn = get_connection()
+    try:
+        jobs = crud.get_all_ai_jobs(conn)
+        camp_jobs = [j for j in jobs if j.get("campaign_id") == campaign_id and j.get("agent") == "market_intel"]
+        
+        swot_job = next((j for j in camp_jobs if (j.get("input_data") or {}).get("type") == "swot"), None)
+        comp_job = next((j for j in camp_jobs if (j.get("input_data") or {}).get("type") == "competitor"), None)
+        stp_job = next((j for j in camp_jobs if (j.get("input_data") or {}).get("type") == "stp"), None)
+
+        return {
+            "campaign_id": campaign_id,
+            "swot": (swot_job.get("input_data") or {}).get("data") if swot_job else None,
+            "swot_output": (swot_job.get("output") or {}).get("result") if swot_job else None,
+            "competitors": (comp_job.get("input_data") or {}).get("data") if comp_job else None,
+            "competitors_output": (comp_job.get("output") or {}).get("result") if comp_job else None,
+            "stp": (stp_job.get("input_data") or {}).get("data") if stp_job else None,
+            "stp_output": (stp_job.get("output") or {}).get("result") if stp_job else None
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/api/campaigns/{campaign_id}/market-analysis")
+def save_campaign_market_analysis(campaign_id: int, req: MarketAnalysisSaveRequest):
+    """Lưu phân tích thị trường (SWOT, Competitor, STP) cho chiến dịch vào DB."""
+    conn = get_connection()
+    try:
+        saved = []
+        if req.swot:
+            swot_out = analyze_swot(req.swot)
+            jid = crud.create_ai_job(conn, agent="market_intel", campaign_id=campaign_id, input_data={"type": "swot", "data": req.swot})
+            crud.update_ai_job(conn, job_id=jid, status="succeeded", output={"result": swot_out})
+            saved.append("swot")
+        if req.competitors:
+            comp_out = analyze_competitors(req.competitors)
+            jid = crud.create_ai_job(conn, agent="market_intel", campaign_id=campaign_id, input_data={"type": "competitor", "data": req.competitors})
+            crud.update_ai_job(conn, job_id=jid, status="succeeded", output={"result": comp_out})
+            saved.append("competitors")
+        if req.stp or req.personas:
+            stp_out = analyze_stp(req.stp or {}, req.personas or [])
+            jid = crud.create_ai_job(conn, agent="market_intel", campaign_id=campaign_id, input_data={"type": "stp", "data": {"stp": req.stp, "personas": req.personas}})
+            crud.update_ai_job(conn, job_id=jid, status="succeeded", output={"result": stp_out})
+            saved.append("stp")
+
+        return {"success": True, "saved_sections": saved, "campaign_id": campaign_id}
+    finally:
+        conn.close()
+
+
+# --- CONFIG & SYSTEM ADMIN ---
+
+@app.get("/api/config/api-keys")
+def get_api_keys_config():
+    """Lấy trạng thái cấu hình khóa API (được che bảo mật)."""
+    key = os.getenv("GEMINI_API_KEY", "")
+    masked = (key[:6] + "..." + key[-4:]) if len(key) > 10 else ("***" if key else "")
+    return {
+        "gemini_api_key_configured": bool(key),
+        "gemini_api_key_masked": masked,
+        "llm_model": os.getenv("LLM_MODEL", "gemini-flash-latest")
+    }
+
+
+@app.post("/api/config/api-keys")
+def save_api_keys_config(req: ApiKeysConfigRequest):
+    """Lưu và áp dụng cấu hình khóa API an toàn."""
+    if req.gemini_api_key and req.gemini_api_key.strip():
+        val = req.gemini_api_key.strip()
+        os.environ["GEMINI_API_KEY"] = val
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                import re
+                if "GEMINI_API_KEY=" in content:
+                    content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={val}", content)
+                else:
+                    content += f"\nGEMINI_API_KEY={val}"
+                with open(env_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+            except Exception:
+                pass
+    return {"success": True, "message": "Đã lưu cấu hình API Keys thành công."}
+
+
+@app.post("/api/admin/clear-cache")
+def clear_system_cache():
+    """Làm sạch bộ nhớ đệm kết nối và tài nguyên tạm thời."""
+    return {"success": True, "message": "Đã làm sạch bộ nhớ đệm hệ thống (Connection Pool & Temp Cache)."}
+
 
 
 

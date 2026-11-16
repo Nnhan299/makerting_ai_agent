@@ -348,9 +348,13 @@ def delete_posts_by_campaign(conn, campaign_id: int) -> bool:
 # ============================================================
 
 def create_brand_rule(conn, rule_name: str,
-                      forbidden_words: str = "", mandatory_keywords: str = "",
-                      tone_of_voice: str = "", industry: str = "") -> int:
+                      forbidden_words: Any = "", mandatory_keywords: Any = "",
+                      tone_of_voice: str = "", industry: str = "", **kwargs) -> int:
     """Tạo bộ quy tắc thương hiệu mới."""
+    if isinstance(forbidden_words, (list, tuple)):
+        forbidden_words = ", ".join(str(w) for w in forbidden_words)
+    if isinstance(mandatory_keywords, (list, tuple)):
+        mandatory_keywords = ", ".join(str(w) for w in mandatory_keywords)
     is_pg = _is_pg(conn)
     cursor = conn.cursor()
     try:
@@ -968,6 +972,10 @@ def create_partner(conn, partner_type: str, name: str, platform: str = None,
                    follower_count: int = 0, contact_email: str = None,
                    fee_per_post: float = None) -> int:
     """Tạo đối tác mới (KOL/KOC/agency)."""
+    ptype = (partner_type or "other").lower().strip()
+    allowed_types = ('agency', 'kol', 'koc', 'event_organizer', 'media', 'other')
+    if ptype not in allowed_types:
+        ptype = "other"
     is_pg = _is_pg(conn)
     cursor = conn.cursor()
     try:
@@ -977,7 +985,7 @@ def create_partner(conn, partner_type: str, name: str, platform: str = None,
                    (partner_type, name, platform, follower_count, contact_email, fee_per_post)
                    VALUES (%s, %s, %s, %s, %s, %s)
                    RETURNING id""",
-                (partner_type, name, platform, follower_count, contact_email, fee_per_post)
+                (ptype, name, platform, follower_count, contact_email, fee_per_post)
             )
             row = cursor.fetchone()
             conn.commit()
