@@ -90,12 +90,19 @@ class LLMClient:
     def __init__(self, model_name: str = None, temperature: float = 0.7, max_retries: int = 3):
         self.api_key = os.getenv("GEMINI_API_KEY", "").strip()
         self.is_configured = False
-        self.model_name = model_name or os.getenv("LLM_MODEL", "gemini-flash-latest")
+        self.model_name = model_name or os.getenv("LLM_MODEL", "gemini-2.5-flash")
         self.temperature = temperature
         self.max_retries = max_retries
         
-        # Danh sách fallback models theo thứ tự ưu tiên
-        self.fallback_models = [self.model_name, "gemini-flash-latest", "gemini-3.8-flash", "gemini-pro-latest", "gemini-2.5-flash-lite"]
+        # Danh sách fallback models theo thứ tự ưu tiên (ưu tiên dòng 2.5 và 3.6 flash thực tế)
+        self.fallback_models = [
+            self.model_name,
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-3.6-flash",
+            "gemini-3.8-flash",
+            "gemini-flash-latest"
+        ]
         # Loại bỏ trùng lặp
         self.fallback_models = list(dict.fromkeys(self.fallback_models))
 
@@ -144,17 +151,18 @@ class LLMClient:
 
         last_error = None
         for current_model in self.fallback_models:
-            delay = 2
+            delay = 1
             for attempt in range(1, self.max_retries + 1):
                 try:
                     logger.info(f"Gọi Gemini API [{current_model}] (Lần {attempt}/{self.max_retries})...")
                     return self._call_gemini_model(current_model, system_prompt, user_prompt, is_json=False)
-                except InvalidArgument as e:
-                    logger.error(f"API Key hoặc tham số không hợp lệ: {e}")
-                    raise e
                 except (ResourceExhausted, GoogleAPIError, ConnectionError, TimeoutError, Exception) as e:
+                    err_str = str(e).lower()
                     logger.warning(f"Lỗi khi gọi model {current_model} (Lần {attempt}): {e}")
                     last_error = e
+                    # Nếu model trả về 404 (deprecated/không hỗ trợ) hoặc 429 (hết quota), chuyển ngay sang model dự phòng kế tiếp
+                    if "404" in err_str or "not found" in err_str or "no longer available" in err_str or "429" in err_str or "quota" in err_str:
+                        break
                     time.sleep(delay)
                     delay *= 2
 
@@ -189,8 +197,11 @@ class LLMClient:
                     time.sleep(delay)
                     delay *= 2
                 except Exception as e:
+                    err_str = str(e).lower()
                     logger.warning(f"Lỗi API [{current_model}] (Lần {attempt}): {e}")
                     last_error = e
+                    if "404" in err_str or "not found" in err_str or "no longer available" in err_str or "429" in err_str or "quota" in err_str:
+                        break
                     time.sleep(delay)
                     delay *= 2
 

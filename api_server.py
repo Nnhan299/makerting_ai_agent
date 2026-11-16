@@ -991,13 +991,51 @@ def create_ai_job_endpoint(req: AiJobRequest):
         if req.agent == "market_intel":
             req_type = req.type or "swot"
             if req_type == "swot":
-                # Phân tích định lượng chuyên sâu theo 100% dữ liệu người dùng nhập
+                # Phân tích định lượng chuyên sâu
                 camp = crud.get_campaign_by_id(conn, camp_id) or {}
                 budget_str = str(camp.get("budget") or "")
-                if isinstance(req_data, dict) and any(str(v).strip() for v in req_data.values()):
-                    output_data = analyze_swot(req_data, budget_str=budget_str)
-                else:
-                    output_data = analyze_swot({}, budget_str=budget_str)
+                
+                # Ưu tiên gọi trực tiếp Mô hình AI Gemini thật (LLM) nếu có API Key
+                llm_used = False
+                if os.getenv("TESTING") != "1":
+                    try:
+                        llm_client = LLMClient()
+                        if llm_client.is_configured:
+                            s = (req_data.get("strengths") or "").strip()
+                            w = (req_data.get("weaknesses") or "").strip()
+                            o = (req_data.get("opportunities") or "").strip()
+                            t = (req_data.get("threats") or "").strip()
+                            sys_p = (
+                                "Bạn là Giám đốc Chiến lược Marketing (Chief Marketing Officer - CMO) hàng đầu tại thị trường Việt Nam.\n"
+                                "Nhiệm vụ của bạn là phân tích sâu sắc dữ liệu đầu vào của sản phẩm, lập Báo cáo Tình báo Chiến lược & Kế hoạch Tác chiến GTM (Go-To-Market) chuyên sâu, sắc sảo:\n"
+                                "1. BỨC TRANH THỊ TRƯỜNG & ĐỐI THỦ CẠNH TRANH THỰC TẾ TẠI VIỆT NAM (phân khúc, đối thủ lớn, khoảng trống chiến lược).\n"
+                                "2. GIẢI MÃ TÂM LÝ & 3 RÀO CẢN MUA HÀNG LỚN NHẤT CỦA KHÁCH HÀNG Ở MỨC GIÁ NÀY.\n"
+                                "3. KẾ HOẠCH TÁC CHIẾN GO-TO-MARKET 3 GIAI ĐOẠN CỤ THỂ (Giai đoạn 1 Teaser/Blind test, Giai đoạn 2 Bẻ gãy rào cản giá/bảo hành, Giai đoạn 3 Phân phối trải nghiệm).\n"
+                                "4. BỘ CHỈ SỐ BENCHMARK NGÀNH & MÔ HÌNH PHỄU THỰC CHIẾN (Thời gian cân nhắc, CVR, Target CAC, Phân bổ ngân sách).\n"
+                                "5. MA TRẬN PHỐI HỢP CHIẾN LƯỢC HÀNH ĐỘNG TOWS CHUYÊN SÂU (CHIẾN LƯỢC S-O, CHIẾN LƯỢC W-O, CHIẾN LƯỢC S-T, CHIẾN LƯỢC W-T).\n"
+                                "6. CẢNH BÁO PHÁP LÝ (Luật Quảng cáo Việt Nam) VÀ RỦI RO KỸ THUẬT.\n"
+                                "Yêu cầu: Viết chuyên nghiệp, sắc sảo, không chung chung, dùng số liệu và thuật ngữ marketing chuyên nghiệp thực chiến."
+                            )
+                            user_p = (
+                                f"Dữ liệu phân tích SWOT đầu vào:\n"
+                                f"- Điểm mạnh (Strengths): {s}\n"
+                                f"- Điểm yếu (Weaknesses): {w}\n"
+                                f"- Cơ hội (Opportunities): {o}\n"
+                                f"- Thách thức (Threats): {t}\n"
+                                f"- Ngân sách chiến dịch: {budget_str}\n\n"
+                                "Hãy phân tích toàn diện và đưa ra báo cáo chiến lược hoàn chỉnh."
+                            )
+                            output_data = llm_client.call(sys_p, user_p)
+                            if output_data and len(output_data) > 100:
+                                llm_used = True
+                    except Exception as e_llm:
+                        logger.warning(f"Lỗi khi gọi Gemini LLM: {e_llm}, sử dụng engine dự phòng")
+
+                if not llm_used or not output_data:
+                    if isinstance(req_data, dict) and any(str(v).strip() for v in req_data.values()):
+                        output_data = analyze_swot(req_data, budget_str=budget_str)
+                    else:
+                        output_data = analyze_swot({}, budget_str=budget_str)
             elif req_type == "competitor":
                 comps = req_data if isinstance(req_data, list) else []
                 output_data = analyze_competitors(comps)
@@ -1195,7 +1233,7 @@ def get_api_keys_config():
     return {
         "gemini_api_key_configured": bool(key),
         "gemini_api_key_masked": masked,
-        "llm_model": os.getenv("LLM_MODEL", "gemini-flash-latest")
+        "llm_model": os.getenv("LLM_MODEL", "gemini-2.5-flash")
     }
 
 
@@ -1205,20 +1243,21 @@ def save_api_keys_config(req: ApiKeysConfigRequest):
     if req.gemini_api_key and req.gemini_api_key.strip():
         val = req.gemini_api_key.strip()
         os.environ["GEMINI_API_KEY"] = val
-        env_path = os.path.join(os.path.dirname(__file__), ".env")
-        if os.path.exists(env_path):
-            try:
-                with open(env_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                import re
-                if "GEMINI_API_KEY=" in content:
-                    content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={val}", content)
-                else:
-                    content += f"\nGEMINI_API_KEY={val}"
-                with open(env_path, "w", encoding="utf-8") as f:
-                    f.write(content)
-            except Exception:
-                pass
+        if os.getenv("TESTING") != "1":
+            env_path = os.path.join(os.path.dirname(__file__), ".env")
+            if os.path.exists(env_path):
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    import re
+                    if "GEMINI_API_KEY=" in content:
+                        content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={val}", content)
+                    else:
+                        content += f"\nGEMINI_API_KEY={val}"
+                    with open(env_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                except Exception:
+                    pass
     return {"success": True, "message": "Đã lưu cấu hình API Keys thành công."}
 
 
